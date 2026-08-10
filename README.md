@@ -1,8 +1,14 @@
 # PDF Studio AI
 
-**Local-First + AI-Native 的现代 PDF 桌面应用（V0.2）**
+**Local-First + AI-Native 的现代 PDF 桌面应用（v0.4.0）**
 
-个人自用的本地 PDF 工作台：查看、页面管理、合并拆分、OCR、AI Copilot。V0.2 重点打磨 UI/UX、Cloud AI 架构、多主题系统。
+> **🔒 V0.4 Feature Complete / Release Candidate — 已进入真实使用测试阶段**
+>
+> 自 `git tag v0.4.0` 起 Feature Freeze：仅允许 Bug / Security / Compatibility / Performance 修复与严重 UX 修复，不再新增功能。
+
+个人自用的本地 PDF 工作台：查看、页面管理、合并拆分、OCR、AI Copilot。V0.4 完成 AI Workspace（Context Engine + Action Proposal + Document Intelligence），QA 全量通过（113/113 测试、真实 PDF 数据完整性验证）。
+
+**产品模型：PDF 是画布，AI 是副驾驶，用户掌握最终控制权 —— 所有 AI 修改都可确认、可撤销，PDF 数据本身永远优先于 AI。**
 
 ---
 
