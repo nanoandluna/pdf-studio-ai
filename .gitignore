@@ -21,3 +21,7 @@ coverage/
 
 # QA 临时脚本（rename 禁用后不提交）
 *.disabled
+
+# QA/hotfix 残留（rename 后待手动清理）
+dist.old*/
+.hotfix-*/
