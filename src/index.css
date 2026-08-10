@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design Tokens（4 套主题变量） */
+@import './theme/tokens.css';
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html[data-theme] {
+    color-scheme: var(--color-scheme, light);
+  }
+  body {
+    @apply bg-app-bg text-fg antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+    user-select: none;
+    font-size: 13px;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full;
+    background: hsl(var(--scrollbar-thumb));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--scrollbar-thumb-hover));
+  }
+}
+
+@layer components {
+  /* 面板：靠背景层级而非边框（V0.3） */
+  .panel {
+    @apply rounded-xl bg-app-panel;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-all
+      disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none active:scale-[0.98];
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-on hover:bg-accent-hover;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 2px 6px -2px hsl(var(--primary) / 0.4);
+  }
+  .btn-secondary {
+    @apply btn bg-app-panel-hover text-fg hover:bg-app-panel-active;
+  }
+  .btn-ghost {
+    @apply btn text-fg-muted hover:bg-app-panel-hover hover:text-fg;
+  }
+  .btn-danger {
+    @apply btn bg-danger/90 text-white hover:bg-danger;
+  }
+  .input {
+    @apply w-full rounded-md bg-app-panel-hover px-3 py-1.5 text-[13px] text-fg outline-none
+      placeholder:text-fg-subtle transition-all
+      focus:bg-app-panel focus:ring-2 focus:ring-accent/25;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium text-fg-muted;
+  }
+  .kbd {
+    @apply inline-flex items-center rounded-md bg-app-panel-hover px-1.5 py-0.5 font-mono text-[10px] text-fg-muted;
+  }
+  .card {
+    @apply rounded-xl bg-app-panel;
+  }
+
+  /* 文本层级工具类 */
+  .text-title { @apply text-[15px] font-semibold text-fg; }
+  .text-body { @apply text-[13px] leading-relaxed text-fg; }
+  .text-secondary { @apply text-xs text-fg-muted; }
+  .text-caption { @apply text-[11px] text-fg-subtle; }
+}
+
+/* 缩略图选中态：accent + subtle 背景，不用粗边框（V0.3） */
+.thumb-selected {
+  @apply bg-accent-soft ring-1 ring-accent/40;
+}
+
+/* 主题切换过渡 */
+.theme-transition * {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 微妙分隔线（替代边框） */
+.divider-y {
+  @apply mx-1 h-4 w-px;
+  background: hsl(var(--divider));
+}
+.divider-x {
+  height: 1px;
+  background: hsl(var(--divider));
+}
+
+/* ============ AI Markdown 排版（V0.3.1） ============ */
+.markdown-body {
+  font-size: 13px;
+  line-height: 1.75;
+  color: hsl(var(--foreground));
+  word-break: break-word;
+}
+.markdown-body > * + * {
+  margin-top: 6px;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  line-height: 1.4;
+}
+.markdown-body h1 { font-size: 16px; margin-top: 12px; }
+.markdown-body h2 { font-size: 15px; margin-top: 10px; }
+.markdown-body h3 { font-size: 14px; margin-top: 8px; }
+.markdown-body p { margin: 4px 0; }
+.markdown-body ul, .markdown-body ol { padding-left: 18px; }
+.markdown-body li { margin: 2px 0; }
+.markdown-body blockquote {
+  margin: 6px 0;
+  padding-left: 10px;
+  border-left: 2px solid hsl(var(--border-strong));
+  color: hsl(var(--muted));
+}
+.markdown-body pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: hsl(var(--surface-hover));
+  overflow-x: auto;
+}
+.markdown-body code {
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: 0.9em;
+}
+.markdown-body :not(pre) > code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: hsl(var(--surface-hover));
+  color: hsl(var(--ai-accent));
+}
+.markdown-body table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.markdown-body th, .markdown-body td {
+  padding: 5px 10px;
+  border-bottom: 1px solid hsl(var(--divider));
+  text-align: left;
+}
+.markdown-body hr {
+  border: 0;
+  height: 1px;
+  background: hsl(var(--divider));
+  margin: 10px 0;
+}
+.markdown-body strong { font-weight: 600; color: hsl(var(--foreground)); }
+.markdown-body em { font-style: italic; }
+.markdown-body a { color: hsl(var(--ai-accent)); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }

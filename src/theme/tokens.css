@@ -1,0 +1,212 @@
+/* ============================================================
+   Design Tokens — 主题变量层（V0.3 Visual Refactor）
+   原则：Less UI, More hierarchy
+   - 边框对比度显著降低（多数情况用层级/留白/微妙分隔替代边框）
+   - 新增 --divider（纯分隔线）/ --border-faint（极弱边界）
+   - 新增 --elevation-1/2/3（替代边框的层级感）
+   - 四套主题共用同一套结构，仅改变背景/表面/文字/accent/阴影
+   ============================================================ */
+
+:root,
+[data-theme='obsidian'] {
+  color-scheme: dark;
+
+  /* ============ Level 0-4 视觉层级 ============
+     L0 App Background      → --background
+     L1 Surface             → --surface
+     L2 Elevated Surface    → --elevated
+     L3 Interactive Surface → --surface-hover / --surface-active
+     L4 Accent              → --primary / --ai-accent
+  ============================================ */
+
+  /* ---- L0 基础 ---- */
+  --background: 222 16% 5%;            /* #0B0D10 近黑 */
+  --foreground: 220 13% 91%;           /* #E6E7EB */
+
+  /* ---- L1 表面 ---- */
+  --surface: 222 13% 9%;               /* 面板 */
+  --surface-hover: 222 13% 12%;
+  --surface-active: 222 12% 15%;
+
+  /* ---- L2 抬升 ---- */
+  --elevated: 222 14% 12%;             /* 弹出层 / 对话框 / 浮动工具 */
+  --elevation-1: 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 12px -2px rgb(0 0 0 / 0.3);
+  --elevation-2: 0 4px 12px rgb(0 0 0 / 0.35), 0 16px 40px -8px rgb(0 0 0 / 0.45);
+  --elevation-3: 0 8px 24px rgb(0 0 0 / 0.4), 0 24px 64px -12px rgb(0 0 0 / 0.55);
+
+  /* ---- 分隔 / 边界（低对比，几乎不打扰） ---- */
+  --divider: 222 12% 14%;              /* 区块间极弱分隔线 */
+  --border: 222 10% 18%;               /* 需要真实边界的元素 */
+  --border-faint: 222 10% 15%;
+  --border-strong: 222 10% 24%;
+
+  /* ---- L4 Accent（蓝紫）---- */
+  --primary: 243 88% 69%;              /* #6E6AF6 */
+  --primary-hover: 243 82% 63%;
+  --primary-soft: 243 45% 20%;
+  --on-primary: 0 0% 100%;
+
+  /* ---- AI 强调 ---- */
+  --ai-accent: 243 88% 69%;
+  --ai-glow: 243 88% 69% / 0.28;
+
+  /* ---- 文本层级 ---- */
+  --muted: 220 8% 58%;
+  --subtle: 220 8% 44%;
+
+  /* ---- 语义色 ---- */
+  --success: 152 60% 52%;
+  --warning: 38 92% 58%;
+  --danger: 0 72% 60%;
+  --info: 200 90% 62%;
+
+  /* ---- 圆角 ---- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ---- 阴影（兼容旧 token 名） ---- */
+  --shadow-soft: var(--elevation-1);
+  --shadow-pop: var(--elevation-2);
+  --shadow-glow: 0 0 20px 0 rgb(110 106 246 / 0.2);
+
+  /* ---- 滚轮 ---- */
+  --scrollbar-thumb: 222 8% 20%;
+  --scrollbar-thumb-hover: 222 8% 28%;
+}
+
+/* ---------------- Theme 02 — Paper（阅读 / 论文 / 办公） ---------------- */
+[data-theme='paper'] {
+  color-scheme: light;
+
+  --background: 40 22% 97%;            /* #FAF9F6 暖白 */
+  --foreground: 220 12% 16%;
+
+  --surface: 0 0% 100%;
+  --surface-hover: 40 16% 95%;
+  --surface-active: 40 14% 92%;
+
+  --elevated: 0 0% 100%;
+  --elevation-1: 0 1px 2px rgb(0 0 0 / 0.03), 0 2px 8px -2px rgb(0 0 0 / 0.04);
+  --elevation-2: 0 4px 12px rgb(0 0 0 / 0.07), 0 16px 40px -8px rgb(0 0 0 / 0.1);
+  --elevation-3: 0 8px 24px rgb(0 0 0 / 0.09), 0 24px 64px -12px rgb(0 0 0 / 0.14);
+
+  --divider: 40 12% 90%;
+  --border: 40 12% 86%;
+  --border-faint: 40 12% 90%;
+  --border-strong: 40 10% 76%;
+
+  --primary: 221 83% 47%;              /* 深蓝 */
+  --primary-hover: 221 80% 42%;
+  --primary-soft: 221 90% 95%;
+  --on-primary: 0 0% 100%;
+
+  --ai-accent: 221 83% 47%;
+  --ai-glow: 221 83% 47% / 0.14;
+
+  --muted: 220 8% 46%;
+  --subtle: 220 8% 58%;
+
+  --success: 152 60% 42%;
+  --warning: 38 92% 50%;
+  --danger: 0 72% 52%;
+  --info: 200 90% 50%;
+
+  --shadow-soft: var(--elevation-1);
+  --shadow-pop: var(--elevation-2);
+  --shadow-glow: 0 0 16px 0 rgb(43 89 195 / 0.12);
+
+  --scrollbar-thumb: 40 10% 78%;
+  --scrollbar-thumb-hover: 40 10% 68%;
+}
+
+/* ---------------- Theme 03 — Midnight（AI / 科技 / 深蓝黑） ---------------- */
+[data-theme='midnight'] {
+  color-scheme: dark;
+
+  --background: 228 50% 4%;            /* #05070F */
+  --foreground: 216 40% 88%;
+
+  --surface: 226 45% 8%;
+  --surface-hover: 226 45% 11%;
+  --surface-active: 226 45% 14%;
+
+  --elevated: 226 45% 11%;
+  --elevation-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px -2px rgb(0 0 0 / 0.45);
+  --elevation-2: 0 4px 12px rgb(0 0 0 / 0.45), 0 16px 40px -8px rgb(0 0 0 / 0.55);
+  --elevation-3: 0 8px 24px rgb(0 0 0 / 0.5), 0 24px 64px -12px rgb(0 0 0 / 0.65);
+
+  --divider: 226 42% 14%;
+  --border: 226 40% 18%;
+  --border-faint: 226 42% 14%;
+  --border-strong: 226 38% 26%;
+
+  --primary: 199 90% 60%;              /* 电光蓝 #38BDF8 */
+  --primary-hover: 199 90% 52%;
+  --primary-soft: 199 60% 18%;
+  --on-primary: 228 60% 8%;
+
+  --ai-accent: 199 90% 60%;
+  --ai-glow: 199 90% 60% / 0.26;
+
+  --muted: 216 25% 58%;
+  --subtle: 216 25% 42%;
+
+  --success: 152 70% 55%;
+  --warning: 38 95% 60%;
+  --danger: 0 75% 62%;
+  --info: 199 90% 60%;
+
+  --shadow-soft: var(--elevation-1);
+  --shadow-pop: var(--elevation-2);
+  --shadow-glow: 0 0 20px 0 rgb(56 189 248 / 0.18);
+
+  --scrollbar-thumb: 226 35% 20%;
+  --scrollbar-thumb-hover: 226 35% 28%;
+}
+
+/* ---------------- Theme 04 — Aurora（高级 AI / 紫蓝） ---------------- */
+[data-theme='aurora'] {
+  color-scheme: dark;
+
+  --background: 250 30% 6%;            /* #0A0A14 紫黑 */
+  --foreground: 252 30% 92%;
+
+  --surface: 250 28% 10%;
+  --surface-hover: 250 28% 14%;
+  --surface-active: 250 26% 18%;
+
+  --elevated: 250 28% 13%;
+  --elevation-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px -2px rgb(0 0 0 / 0.4);
+  --elevation-2: 0 4px 12px rgb(0 0 0 / 0.45), 0 16px 40px -8px rgb(0 0 0 / 0.5);
+  --elevation-3: 0 8px 24px rgb(0 0 0 / 0.5), 0 24px 64px -12px rgb(0 0 0 / 0.6);
+
+  --divider: 250 22% 16%;
+  --border: 250 20% 20%;
+  --border-faint: 250 22% 16%;
+  --border-strong: 250 20% 28%;
+
+  --primary: 262 84% 76%;              /* 紫 #A78BFA */
+  --primary-hover: 262 84% 70%;
+  --primary-soft: 262 50% 22%;
+  --on-primary: 250 30% 8%;
+
+  --ai-accent: 262 84% 76%;
+  --ai-glow: 262 84% 76% / 0.26;
+
+  --muted: 252 18% 60%;
+  --subtle: 252 18% 46%;
+
+  --success: 152 70% 58%;
+  --warning: 38 95% 62%;
+  --danger: 0 78% 66%;
+  --info: 199 92% 64%;
+
+  --shadow-soft: var(--elevation-1);
+  --shadow-pop: var(--elevation-2);
+  --shadow-glow: 0 0 24px 0 rgb(167 139 250 / 0.22);
+
+  --scrollbar-thumb: 250 20% 22%;
+  --scrollbar-thumb-hover: 250 20% 30%;
+}

@@ -1,0 +1,36 @@
+appId: com.pdfstudio.ai
+productName: PDF Studio AI
+copyright: Copyright © 2026 PDF Studio AI
+
+directories:
+  output: release/${version}
+  buildResources: build
+
+files:
+  - dist/**
+  - package.json
+
+# 主进程入口由 package.json 的 "main" 字段提供（esbuild 打包为 CJS）
+
+win:
+  target:
+    - target: portable
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: PDF Studio AI
+
+portable:
+  artifactName: ${productName}-${version}-portable.exe
+
+electronLanguages:
+  - zh-CN
+  - en-US
+
+npmRebuild: false

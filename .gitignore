@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+.npm-cache/
+
+# build outputs
+dist/
+release/
+*.log
+
+# electron
+out/
+
+# test
+coverage/
+
+# misc
+.DS_Store
+*.local
+.env
+.env.*
+
+# QA 临时脚本（rename 禁用后不提交）
+*.disabled
