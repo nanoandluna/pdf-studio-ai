@@ -212,6 +212,16 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
     // #8：开始新轮次，使旧请求（若有）失效
     const mySeq = beginAiRequest();
+    // #8 修复：被取代的请求必须清理 UI 状态，否则 thinking/streaming 卡死面板
+    // （后续所有消息都会被 if (thinking) return 拦截）
+    const stale = () => currentAiRequestSeq() !== mySeq;
+    const abortStale = () => {
+      if (stale()) {
+        set({ thinking: false, streaming: false, streamingText: '', toolSteps: [] });
+        return true;
+      }
+      return false;
+    };
 
     const ctx = buildDocumentContext();
     // 应用 scope（opts 优先，否则当前 store 的 contextScope）
@@ -391,8 +401,8 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
           },
           config
         )) {
-          // #8：请求已被新请求/文档关闭取代 → 停止写入
-          if (currentAiRequestSeq() !== mySeq) return;
+          // #8：请求已被新请求/文档关闭取代 → 清理状态并停止写入
+          if (abortStale()) return;
           if (chunk.delta) {
             finalContent += chunk.delta;
             set({ streamingText: finalContent, messages: get().messages.map((m) => (m.id === assistantId ? { ...m, content: finalContent } : m)) });
@@ -400,8 +410,8 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
         }
       }
 
-      // #8：被取代则不再写最终消息
-      if (currentAiRequestSeq() !== mySeq) return;
+      // #8：被取代则清理状态，不再写最终消息
+      if (abortStale()) return;
 
       const final: AIMessage = {
         id: assistantId,
@@ -420,8 +430,8 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
         toolSteps: [],
       }));
     } catch (e) {
-      // #8：请求被新请求/文档关闭取代 → 不显示错误
-      if (currentAiRequestSeq() !== mySeq) return;
+      // #8：请求被新请求/文档关闭取代 → 清理状态，不显示错误
+      if (abortStale()) return;
       const err = toFriendlyError(e, 'AI 暂时无法回答这个问题。请检查网络连接或 AI 设置。');
       logger.error('AI chat 失败', { detail: err.detail });
       set((s) => ({
