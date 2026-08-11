@@ -4,6 +4,16 @@
 // ============================================================
 
 import { contextBridge, ipcRenderer } from 'electron';
+import { MENU_CHANNELS } from './menuChannels';
+
+// ============ 原生菜单事件桥接 ============
+// 主进程菜单点击通过 webContents.send('menu:*') 发送 IPC 事件；
+// App.tsx 监听的是 window 上的同名 DOM CustomEvent。
+// 这里把 IPC 事件桥接为 DOM 事件，保证原生菜单与应用内
+// 工具栏/命令面板共用同一套事件链路（单一入口）。
+for (const ch of MENU_CHANNELS) {
+  ipcRenderer.on(ch, () => window.dispatchEvent(new CustomEvent(ch)));
+}
 
 const bridge = {
   // 文件对话框

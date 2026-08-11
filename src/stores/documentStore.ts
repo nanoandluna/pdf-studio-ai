@@ -11,6 +11,7 @@ import type { PdfEditOperations } from '@engine/types';
 import { CommandHistory, type PdfCommand } from '@commands/types';
 import { logger } from '@lib/logger';
 import { FriendlyError, toFriendlyError } from '@lib/errors';
+import { cancelAiRequests } from '@lib/aiAbort';
 import { useRecentFilesStore } from './recentFilesStore';
 
 export const viewEngine = new PdfjsViewEngine();
@@ -119,6 +120,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   openBytes: async (data, path, name) => {
     set({ loading: true, error: null });
+    // #8：文档切换时取消在途 AI 请求（避免流式写脏/对旧 doc 提取文本）
+    cancelAiRequests();
     try {
       // 释放旧文档
       const old = get().document;
@@ -154,6 +157,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
 
   closeDocument: async () => {
+    // #8：关闭文档时取消在途 AI 请求
+    cancelAiRequests();
     const { document } = get();
     if (document) await viewEngine.dispose(document.id).catch(() => undefined);
     sourceBytes = null;

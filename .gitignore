@@ -19,9 +19,19 @@ coverage/
 .env
 .env.*
 
-# QA 临时脚本（rename 禁用后不提交）
-*.disabled
+# QA 临时脚本（rename 禁用后不提交，含 .disabled.x 变体）
+*.disabled*
 
 # QA/hotfix 残留（rename 后待手动清理）
 dist.old*/
 .hotfix-*/
+
+# QA 临时目录（可能含真实文档，禁止提交）
+scripts/.qa-tmp/
+
+# 本地 npm 镜像配置（不提交，避免全球贡献者默认走国内镜像）
+.npmrc.local
+
+# 构建/冒烟截图（正式主题预览在 docs/assets/）
+*.png
+!docs/assets/*.png

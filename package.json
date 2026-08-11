@@ -46,5 +46,24 @@
     "electron": true,
     "esbuild": true,
     "electron-builder": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yuan1z0825/pdf-studio-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Yuan1z0825/pdf-studio-ai/issues"
+  },
+  "homepage": "https://github.com/Yuan1z0825/pdf-studio-ai#readme",
+  "keywords": [
+    "pdf",
+    "electron",
+    "ai",
+    "copilot",
+    "ocr",
+    "desktop"
+  ],
+  "engines": {
+    "node": ">=18"
   }
 }

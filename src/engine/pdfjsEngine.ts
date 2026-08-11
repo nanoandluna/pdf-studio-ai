@@ -22,6 +22,24 @@ interface OpenDoc {
 
 export class PdfjsViewEngine implements PdfViewEngine {
   private docs = new Map<string, OpenDoc>();
+  // 按 docId 跟踪在途渲染任务：dispose 时取消，避免与正在渲染/提取的任务撞车
+  private docRenderTasks = new Map<string, Set<{ cancel: () => void }>>();
+
+  private trackTask(docId: string, task: { cancel: () => void }): void {
+    let set = this.docRenderTasks.get(docId);
+    if (!set) {
+      set = new Set();
+      this.docRenderTasks.set(docId, set);
+    }
+    set.add(task);
+  }
+  private untrackTask(docId: string, task: { cancel: () => void }): void {
+    const set = this.docRenderTasks.get(docId);
+    if (set) {
+      set.delete(task);
+      if (set.size === 0) this.docRenderTasks.delete(docId);
+    }
+  }
 
   async open(data: ArrayBuffer, path: string, name: string): Promise<PdfDocument> {
     const id = crypto.randomUUID();
@@ -94,7 +112,13 @@ export class PdfjsViewEngine implements PdfViewEngine {
     canvas.style.width = `${Math.floor(viewport.width)}px`;
     canvas.style.height = `${Math.floor(viewport.height)}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    const task = page.render({ canvasContext: ctx, viewport });
+    this.trackTask(docId, task);
+    try {
+      await task.promise;
+    } finally {
+      this.untrackTask(docId, task);
+    }
     return { width: viewport.width, height: viewport.height, rotation };
   }
 
@@ -211,6 +235,18 @@ export class PdfjsViewEngine implements PdfViewEngine {
   }
 
   async dispose(docId: string): Promise<void> {
+    // 先取消该文档所有在途渲染任务（防止与 destroy 撞车）
+    const tasks = this.docRenderTasks.get(docId);
+    if (tasks) {
+      for (const t of tasks) {
+        try {
+          t.cancel();
+        } catch {
+          // 取消失败忽略
+        }
+      }
+      this.docRenderTasks.delete(docId);
+    }
     const d = this.docs.get(docId);
     if (d) {
       await d.doc.destroy().catch(() => undefined);

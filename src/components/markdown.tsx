@@ -70,6 +70,8 @@ function inline(text: string, citationMap: Map<string, number>, keyPrefix: strin
         const href = urlMatch[2];
         const isInternal = href.startsWith('#page-');
         const pageNum = isInternal ? parseInt(href.replace('#page-', ''), 10) : NaN;
+        // 协议白名单：只允许内部页跳转和 https 外链（拒绝 javascript:/data: 等）
+        const isSafeExternal = /^https:\/\//i.test(href);
         out.push(
           isInternal && !isNaN(pageNum) ? (
             <button
@@ -79,16 +81,21 @@ function inline(text: string, citationMap: Map<string, number>, keyPrefix: strin
             >
               {urlMatch[1]}
             </button>
-          ) : (
+          ) : isSafeExternal ? (
             <a
               key={`${keyPrefix}-l-${idx++}`}
               href={href}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
             >
               {urlMatch[1]}
             </a>
+          ) : (
+            // 非白名单协议（javascript: / data: 等）渲染为纯文本，防止 XSS
+            <span key={`${keyPrefix}-l-${idx++}`} className="text-fg">
+              {urlMatch[1]}
+            </span>
           )
         );
       }

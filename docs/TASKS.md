@@ -57,7 +57,7 @@
 - [x] **微动画**：Sidebar / Dialog / Theme 切换 / Toast / Palette 150–300ms
 - [x] **AI 引用提取**：从回复自动提取 "第 N 页" / "第 N-M 页" 并跳转
 - [x] **docs/DESIGN-SYSTEM.md** 完整文档
-- [x] **测试 76/76**：新增 Theme（7）/ AI Providers（10）/ V0.2 Features（8）
+- [x] **测试（V0.2 阶段）**：新增 Theme（7）/ AI Providers（10）/ V0.2 Features（8）
 - [x] **V0.1 回归无破坏**：51 个 V0.1 测试全绿
 
 ## V0.2 验证记录
@@ -65,7 +65,7 @@
 > 所有 V0.1 + V0.2 任务已完成并通过自动验证
 
 - **TypeScript 编译**：`tsc --noEmit` 0 错误
-- **单元 + 集成测试**：**76/76** 通过
+- **单元 + 集成测试**：V0.2 阶段 **76/76** 通过（当前全量 136/136）
   - V0.1 回归：51 个（PageRange / Command / Search / AI Tools / PDF Engine）
   - V0.2 新增：25 个（Theme System / AI Providers / Streaming / Context / Command Palette / Citations）
 - **V0.1 冒烟**（`node scripts/smoke3.mjs`）：PDF 加载（4 页）/ 缩略图（4/4）/ 删除 / Undo —— **无 React 错误**
@@ -116,7 +116,7 @@ UI  →  AIStore  →  ProviderRegistry  →  ProviderAdapter  →  Cloud API
 - 确认为后调用 `useDocumentStore.deletePages/rotatePages/...` 走 CommandHistory
 - 撤销用 `commandHistory.undo()` —— 同一个 AI 操作的 N 个 actions 逐个 undo
 
-**测试**：V0.4 新增 15 个（Context Engine / Action Proposal / parseInsightJson），全量 **111/111**
+**测试**：V0.4 新增 15 个（Context Engine / Action Proposal / parseInsightJson），全量 **136/136**（含后续安全回归测试）
 **冒烟**：V0.4 专用冒烟通过（action-card/confirm/undo/reading-context/insights-trigger）
 **视觉**：`v04-ai-workspace.png`（Action 已完成状态 + 「分析」按钮 + Context=Selection）
 

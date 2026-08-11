@@ -44,13 +44,27 @@ export function Viewer(): JSX.Element {
   // 页面渲染状态
   const [renderedSizes, setRenderedSizes] = useState<Record<number, { w: number; h: number }>>({});
 
-  // 用第一页渲染后的真实尺寸校准 Fit Width 基准（放在 renderedSizes 声明之后）
+  // 用第一页的固有尺寸（scale=1）校准 Fit Width 基准。
+  // 注意：不能用渲染后的尺寸 —— renderedSizes → basePageWidth → effectiveScale → 重渲染
+  // → renderedSizes 会形成不收敛的 2 周期反馈循环，表现为页面上下持续跳动
+  // （且只在首屏页处于渲染窗口、即当前页为 1~3 时触发）。
   useEffect(() => {
-    if (visiblePageIndexes.length === 0) return;
+    if (!document || visiblePageIndexes.length === 0) return;
     const first = visiblePageIndexes[0];
-    const size = renderedSizes[first];
-    if (size && size.w > 0) setBasePageWidth(size.w);
-  }, [renderedSizes, visiblePageIndexes]);
+    const extraRot = pageRotations[first] ?? 0;
+    let cancelled = false;
+    viewEngine
+      .getPageSize(document.id, first)
+      .then(({ width, height }) => {
+        if (cancelled) return;
+        // 附加旋转 90/270 时宽高互换
+        setBasePageWidth(extraRot % 180 !== 0 ? height : width);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [document, visiblePageIndexes, pageRotations]);
 
   // 观察容器宽度
   useEffect(() => {
@@ -147,6 +161,8 @@ export function Viewer(): JSX.Element {
           } else {
             file.arrayBuffer().then((buf) => {
               useDocumentStore.getState().openBytes(buf, file.name, file.name);
+            }).catch(() => {
+              useDocumentStore.getState().setError('无法读取该文件，请确认文件未损坏。');
             });
           }
         }

@@ -47,11 +47,17 @@ export class TesseractOcrService {
         logger: (m) => {
           if (m.status === 'recognizing text') logger.debug('OCR 进度', m);
         },
-      }).then((w) => {
-        this.worker = w;
-        this.currentLang = resolved;
-        return w;
-      });
+      })
+        .then((w) => {
+          this.worker = w;
+          this.currentLang = resolved;
+          return w;
+        })
+        .catch((e) => {
+          // 创建失败时清空缓存，允许下次重试（否则会一直抛同一个错）
+          this.workerPromise = null;
+          throw e;
+        });
     }
     return this.workerPromise;
   }

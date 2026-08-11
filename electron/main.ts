@@ -8,6 +8,8 @@ import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { buildMenuTemplate } from './menuTemplate';
+import type { MenuChannel } from './menuChannels';
 
 // esbuild --format=cjs 自动注入 __dirname
 declare const __dirname: string;
@@ -35,19 +37,51 @@ function readJson<T>(file: string, fallback: T): T {
     return fallback;
   }
 }
+// 原子写：先写 .tmp 再 rename，避免写一半崩溃损坏 settings.json / secrets.json
 function writeJson(file: string, data: unknown): void {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8');
+  fs.renameSync(tmp, file);
+}
+
+// ============ 文件访问白名单（开源安全：renderer 只能读写在对话框/最近文件中出现的路径）============
+const allowedPaths = new Set<string>(); // 精确路径（对话框返回、最近文件）
+const allowedDirs = new Set<string>(); // 目录前缀（提取/导出目录）
+function allowPath(p: string): void {
+  if (p) allowedPaths.add(path.resolve(p));
+}
+function allowDir(d: string): void {
+  if (d) allowedDirs.add(path.resolve(d));
+}
+function isAllowedPath(p: string): boolean {
+  if (!p) return false;
+  const resolved = path.resolve(p);
+  if (allowedPaths.has(resolved)) return true;
+  for (const dir of allowedDirs) {
+    if (resolved === dir || resolved.startsWith(dir + path.sep)) return true;
+  }
+  return false;
+}
+
+// ============ 文件大小限制（防止超大文件整读内存暴涨）============
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+async function readFileWithLimit(p: string): Promise<Buffer> {
+  const st = await fs.promises.stat(p);
+  if (st.size > MAX_FILE_SIZE) {
+    throw new Error(`文件过大（${(st.size / 1024 / 1024).toFixed(1)} MB），超过 100 MB 上限`);
+  }
+  return fs.promises.readFile(p);
 }
 
 // ============ 安全存储（safeStorage 加密）============
+// 开源安全：key 必须来自白名单；safeStorage 不可用时拒绝存储（不降级为可逆 base64）
+const SECURE_KEYS = new Set(['ai.apiKey', 'ai.provider']);
 function encryptValue(plain: string): string {
   if (!plain) return '';
   if (electron.safeStorage.isEncryptionAvailable()) {
     return 'v1:' + electron.safeStorage.encryptString(plain).toString('base64');
   }
-  // 降级：Base64 编码（不加密，记录警告）
-  console.warn('safeStorage 不可用，API Key 将以可逆编码保存');
-  return 'plain:' + Buffer.from(plain, 'utf-8').toString('base64');
+  throw new Error('系统安全存储不可用，拒绝保存敏感信息');
 }
 function decryptValue(stored: string): string {
   if (!stored) return '';
@@ -55,9 +89,7 @@ function decryptValue(stored: string): string {
     if (stored.startsWith('v1:')) {
       return electron.safeStorage.decryptString(Buffer.from(stored.slice(3), 'base64'));
     }
-    if (stored.startsWith('plain:')) {
-      return Buffer.from(stored.slice(6), 'base64').toString('utf-8');
-    }
+    // 历史遗留的 plain: 数据不再解密（安全策略收紧后旧降级数据失效）
   } catch {
     // 解密失败返回空
   }
@@ -93,9 +125,9 @@ function createWindow(): void {
     win.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
-  // 外链用系统浏览器打开
+  // 外链用系统浏览器打开（只放行 https，拒绝 http://localhost 等内网/非加密链接）
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http')) shell.openExternal(url);
+    if (url.startsWith('https://')) shell.openExternal(url);
     return { action: 'deny' };
   });
 
@@ -104,61 +136,13 @@ function createWindow(): void {
   win.on('closed', () => (mainWindow = null));
 }
 
+function sendToRenderer(channel: MenuChannel): void {
+  const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+  win?.webContents.send(channel);
+}
+
 function createMenu(): void {
-  const isMac = process.platform === 'darwin';
-  const template: Electron.MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
-    {
-      label: '文件',
-      submenu: [
-        { label: '打开…', accelerator: 'CmdOrCtrl+O', click: () => mainWindow?.webContents.send('menu:open') },
-        { label: '保存', accelerator: 'CmdOrCtrl+S', click: () => mainWindow?.webContents.send('menu:save') },
-        { label: '另存为…', accelerator: 'CmdOrCtrl+Shift+S', click: () => mainWindow?.webContents.send('menu:save-as') },
-        { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit', label: '退出' },
-      ],
-    },
-    {
-      label: '编辑',
-      submenu: [
-        { role: 'undo', label: '撤销' },
-        { role: 'redo', label: '重做' },
-        { type: 'separator' },
-        { role: 'cut', label: '剪切' },
-        { role: 'copy', label: '复制' },
-        { role: 'paste', label: '粘贴' },
-        { role: 'selectAll', label: '全选' },
-      ],
-    },
-    {
-      label: '视图',
-      submenu: [
-        { role: 'reload', label: '重新加载' },
-        { role: 'toggleDevTools', label: '开发者工具' },
-        { type: 'separator' },
-        { role: 'resetZoom', label: '实际大小' },
-        { role: 'zoomIn', label: '放大' },
-        { role: 'zoomOut', label: '缩小' },
-        { type: 'separator' },
-        { role: 'togglefullscreen', label: '全屏' },
-      ],
-    },
-    {
-      label: '工具',
-      submenu: [
-        { label: '合并 PDF…', click: () => mainWindow?.webContents.send('menu:merge') },
-        { label: '拆分 PDF…', click: () => mainWindow?.webContents.send('menu:split') },
-        { type: 'separator' },
-        { label: 'OCR 识别…', click: () => mainWindow?.webContents.send('menu:ocr') },
-      ],
-    },
-    {
-      label: '帮助',
-      submenu: [
-        { label: '关于 PDF Studio AI', click: () => mainWindow?.webContents.send('menu:about') },
-      ],
-    },
-  ];
+  const template = buildMenuTemplate({ isMac: process.platform === 'darwin', isDev, send: sendToRenderer });
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
@@ -173,7 +157,8 @@ function registerIpc(): void {
     });
     if (res.canceled || res.filePaths.length === 0) return { cancelled: true };
     const p = res.filePaths[0];
-    const data = await fs.promises.readFile(p);
+    allowPath(p);
+    const data = await readFileWithLimit(p);
     return {
       cancelled: false,
       path: p,
@@ -191,7 +176,8 @@ function registerIpc(): void {
     if (res.canceled || res.filePaths.length === 0) return { cancelled: true, files: [] };
     const files = [];
     for (const p of res.filePaths) {
-      const data = await fs.promises.readFile(p);
+      allowPath(p);
+      const data = await readFileWithLimit(p);
       files.push({
         path: p,
         name: path.basename(p),
@@ -208,6 +194,7 @@ function registerIpc(): void {
       filters: opts?.filters ?? [{ name: 'PDF', extensions: ['pdf'] }],
     });
     if (res.canceled || !res.filePath) return { cancelled: true, path: '' };
+    allowPath(res.filePath);
     return { cancelled: false, path: res.filePath };
   });
 
@@ -217,16 +204,19 @@ function registerIpc(): void {
       properties: ['openDirectory', 'createDirectory'],
     });
     if (res.canceled || res.filePaths.length === 0) return { path: null };
+    allowDir(res.filePaths[0]);
     return { path: res.filePaths[0] };
   });
 
-  // ---- 文件读写 ----
+  // ---- 文件读写（白名单：只允许对话框/最近文件中出现过的路径）----
   ipcMain.handle('fs:readFile', async (_e, p: string) => {
-    const data = await fs.promises.readFile(p);
+    if (!isAllowedPath(p)) throw new Error('无权读取该路径');
+    const data = await readFileWithLimit(p);
     return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   });
 
   ipcMain.handle('fs:writeFile', async (_e, p: string, data: Uint8Array) => {
+    if (!isAllowedPath(p)) throw new Error('无权写入该路径');
     await fs.promises.writeFile(p, Buffer.from(data));
   });
 
@@ -241,6 +231,8 @@ function registerIpc(): void {
     );
     const next = [entry, ...list.filter((f) => f.path !== entry.path)].slice(0, 20);
     writeJson(fileOf('recent-files.json'), next);
+    // 最近文件路径加入白名单（允许从最近列表重新打开）
+    allowPath(entry?.path);
     // 标记不可用
     const withAvailability = next.map((f) => ({
       ...f,
@@ -264,17 +256,20 @@ function registerIpc(): void {
   );
   ipcMain.handle('settings:set', (_e, settings) => writeJson(fileOf('settings.json'), settings));
 
-  // ---- 安全存储 ----
+  // ---- 安全存储（key 白名单 + safeStorage 加密）----
   ipcMain.handle('secure:get', (_e, key: string) => {
+    if (!SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
     const secrets = readJson<Record<string, string>>(fileOf('secrets.json'), {});
     return decryptValue(secrets[key] ?? '');
   });
   ipcMain.handle('secure:set', (_e, key: string, value: string) => {
+    if (!SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
     const secrets = readJson<Record<string, string>>(fileOf('secrets.json'), {});
-    secrets[key] = encryptValue(value);
+    secrets[key] = encryptValue(value); // safeStorage 不可用时抛错（不降级）
     writeJson(fileOf('secrets.json'), secrets);
   });
   ipcMain.handle('secure:delete', (_e, key: string) => {
+    if (!SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
     const secrets = readJson<Record<string, string>>(fileOf('secrets.json'), {});
     delete secrets[key];
     writeJson(fileOf('secrets.json'), secrets);
@@ -305,6 +300,13 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    // 启动时预加载最近文件路径到白名单（否则重启后最近文件无法重新打开）
+    try {
+      const recent = readJson<{ path: string }[]>(fileOf('recent-files.json'), []);
+      for (const f of recent) if (f?.path) allowPath(f.path);
+    } catch {
+      // 忽略预加载失败
+    }
     registerIpc();
     createMenu();
     createWindow();

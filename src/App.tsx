@@ -27,6 +27,7 @@ import { useWorkspaceStore } from '@stores/workspaceStore';
 import { searchIndex } from '@search/index';
 import { Dialog } from '@components/modal';
 import { Button } from '@components/ui';
+import { MENU_CHANNELS, menuStoreAction, type MenuChannel } from '@lib/menuChannels';
 
 // 暴露 store 用于自动化测试 / 调试（不影响生产行为）
 if (typeof window !== 'undefined') {
@@ -83,7 +84,9 @@ export default function App(): JSX.Element {
     loadText();
   }, [document?.id]);
 
-  // 全局快捷键
+  // 全局快捷键（仅保留未被原生菜单 accelerator 接管的按键）
+  // 注：Ctrl+O/S/Z/F、Ctrl+=/-/0、Ctrl+Shift+R、Ctrl+E 等组合键由
+  // 主进程菜单 accelerator 触发 → menu:* 事件，见下方菜单事件注册。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
@@ -93,47 +96,6 @@ export default function App(): JSX.Element {
       if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPaletteOpen(true);
-        return;
-      }
-      // Ctrl+O 打开
-      if (mod && e.key.toLowerCase() === 'o') {
-        e.preventDefault();
-        doc.openFile();
-        return;
-      }
-      // Ctrl+S 保存 / Ctrl+Shift+S 另存为
-      if (mod && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        doc.save(e.shiftKey);
-        return;
-      }
-      // Ctrl+Z / Ctrl+Shift+Z 撤销重做
-      if (mod && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) doc.redo();
-        else doc.undo();
-        return;
-      }
-      // Ctrl+F 搜索
-      if (mod && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        useViewerStore.getState().setSearchOpen(true);
-        return;
-      }
-      // Ctrl+= / Ctrl++ 放大，Ctrl+- 缩小，Ctrl+0 适合页面
-      if (mod && (e.key === '=' || e.key === '+')) {
-        e.preventDefault();
-        useViewerStore.getState().zoomIn();
-        return;
-      }
-      if (mod && e.key === '-') {
-        e.preventDefault();
-        useViewerStore.getState().zoomOut();
-        return;
-      }
-      if (mod && e.key === '0') {
-        e.preventDefault();
-        useViewerStore.getState().fitPage();
         return;
       }
       // PageUp / PageDown 翻页
@@ -157,47 +119,32 @@ export default function App(): JSX.Element {
           toastSuccess(`已删除 ${selectedPages.size} 页`);
         }
       }
-      // Ctrl+E 切换 AI 面板
-      if (mod && e.key.toLowerCase() === 'e') {
-        e.preventDefault();
-        useWorkspaceStore.getState().toggleAiPanel();
-      }
-      // Ctrl+Shift+R 阅读模式
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'r') {
-        e.preventDefault();
-        useWorkspaceStore.getState().toggleReadingMode();
-      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // 主进程菜单事件
+  // 主进程菜单事件（menu:* → DOM 事件，统一分发到 store / 对话框）
   useEffect(() => {
-    const openEvt = () => useDocumentStore.getState().openFile();
-    const saveEvt = () => useDocumentStore.getState().save(false);
-    const saveAsEvt = () => useDocumentStore.getState().save(true);
-    const mergeEvt = () => setMergeOpen(true);
-    const splitEvt = () => setSplitOpen(true);
-    const ocrEvt = () => setOcrOpen(true);
-    const aboutEvt = () => setAboutOpen(true);
-
-    window.addEventListener('menu:open', openEvt);
-    window.addEventListener('menu:save', saveEvt);
-    window.addEventListener('menu:save-as', saveAsEvt);
-    window.addEventListener('menu:merge', mergeEvt);
-    window.addEventListener('menu:split', splitEvt);
-    window.addEventListener('menu:ocr', ocrEvt);
-    window.addEventListener('menu:about', aboutEvt);
-    return () => {
-      window.removeEventListener('menu:open', openEvt);
-      window.removeEventListener('menu:save', saveEvt);
-      window.removeEventListener('menu:save-as', saveAsEvt);
-      window.removeEventListener('menu:merge', mergeEvt);
-      window.removeEventListener('menu:split', splitEvt);
-      window.removeEventListener('menu:ocr', ocrEvt);
-      window.removeEventListener('menu:about', aboutEvt);
+    const tabActions: Partial<Record<MenuChannel, () => void>> = {
+      'menu:merge': () => setMergeOpen(true),
+      'menu:split': () => setSplitOpen(true),
+      'menu:ocr': () => setOcrOpen(true),
+      'menu:about': () => setAboutOpen(true),
     };
+    const handlers = MENU_CHANNELS.map((ch) => {
+      const handler = () => {
+        const storeAction = menuStoreAction(ch);
+        if (storeAction) {
+          void storeAction();
+        } else {
+          tabActions[ch]?.();
+        }
+      };
+      window.addEventListener(ch, handler);
+      return () => window.removeEventListener(ch, handler);
+    });
+    return () => handlers.forEach((dispose) => dispose());
   }, []);
 
   // 阅读模式自动退出（打开文档时若处于阅读模式则保留）

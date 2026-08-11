@@ -47,11 +47,23 @@ export async function applyOperations(
   const out = await PDFDocument.create();
   const copied = await out.copyPages(pdf, kept);
   copied.forEach((p) => out.addPage(p));
-  // 复制元数据
+  // 复制元数据（保留全部常用字段，避免用户保存后元数据丢失）
   const meta = pdf.getTitle();
   if (meta) out.setTitle(meta);
   const author = pdf.getAuthor();
   if (author) out.setAuthor(author);
+  const subject = pdf.getSubject();
+  if (subject) out.setSubject(subject);
+  const keywords = pdf.getKeywords();
+  if (keywords) out.setKeywords(Array.isArray(keywords) ? keywords : [keywords]);
+  const creator = pdf.getCreator();
+  if (creator) out.setCreator(creator);
+  const producer = pdf.getProducer();
+  if (producer) out.setProducer(producer);
+  const creationDate = pdf.getCreationDate();
+  if (creationDate) out.setCreationDate(creationDate);
+  const modDate = pdf.getModificationDate();
+  if (modDate) out.setModificationDate(modDate);
   return out;
 }
 

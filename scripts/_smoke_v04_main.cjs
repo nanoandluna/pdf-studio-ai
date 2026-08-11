@@ -15,7 +15,8 @@ app.whenReady().then(() => {
       const win = BrowserWindow.getAllWindows()[0];
 
       await win.webContents.executeJavaScript(`(async () => {
-        const data = await window.pdfStudio.readFile('${FIXTURE}');
+        await window.pdfStudio.addRecentFile({ path: '${FIXTURE}', name: 'smoke.pdf', lastOpenedAt: Date.now(), pageCount: 3 });
+const data = await window.pdfStudio.readFile('${FIXTURE}');
         await window.__pdfStudioTest__.document.getState().openBytes(data, '${FIXTURE}', 'sample-multi-page.pdf');
       })()`, true);
       await sleep(2500);
