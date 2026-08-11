@@ -88,9 +88,12 @@ export class PdfjsViewEngine implements PdfViewEngine {
     return this.get(docId).doc.numPages;
   }
 
-  async getPageSize(docId: string, pageIndex: number): Promise<{ width: number; height: number }> {
+  async getPageSize(docId: string, pageIndex: number, extraRotation = 0): Promise<{ width: number; height: number }> {
     const page = await this.getPage(docId, pageIndex);
-    const viewport = page.getViewport({ scale: 1 });
+    // 总旋转 = PDF 自带 page.rotate + 用户附加旋转（与 renderPage 一致），
+    // 返回旋转后的可视维度 —— 否则带原生旋转的 PDF 首帧 Fit Width 基准会取错（翻转）
+    const rotation = (page.rotate + extraRotation) % 360;
+    const viewport = page.getViewport({ scale: 1, rotation });
     return { width: viewport.width, height: viewport.height };
   }
 

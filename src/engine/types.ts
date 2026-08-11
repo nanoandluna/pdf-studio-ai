@@ -17,8 +17,8 @@ export interface PdfViewEngine {
     canvas: HTMLCanvasElement,
     extraRotation?: number
   ): Promise<{ width: number; height: number; rotation: number }>;
-  /** 获取页面尺寸（不含旋转） */
-  getPageSize(documentId: string, pageIndex: number): Promise<{ width: number; height: number }>;
+  /** 获取页面尺寸（按总旋转 page.rotate + extraRotation 后的可视维度） */
+  getPageSize(documentId: string, pageIndex: number, extraRotation?: number): Promise<{ width: number; height: number }>;
   extractText(documentId: string, pageIndex?: number): Promise<Map<number, string>>;
   /** 全文搜索，返回所有匹配页 */
   search(documentId: string, query: string): Promise<SearchResult[]>;

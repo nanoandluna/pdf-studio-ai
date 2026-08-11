@@ -48,17 +48,18 @@ export function Viewer(): JSX.Element {
   // 注意：不能用渲染后的尺寸 —— renderedSizes → basePageWidth → effectiveScale → 重渲染
   // → renderedSizes 会形成不收敛的 2 周期反馈循环，表现为页面上下持续跳动
   // （且只在首屏页处于渲染窗口、即当前页为 1~3 时触发）。
+  // v0.4.0 翻转修复：getPageSize 传入附加旋转，返回「总旋转（page.rotate + extraRot）
+  // 后的可视宽度」—— 与 renderPage 的 viewport 完全一致，首帧基准不会再取错方向。
   useEffect(() => {
     if (!document || visiblePageIndexes.length === 0) return;
     const first = visiblePageIndexes[0];
     const extraRot = pageRotations[first] ?? 0;
     let cancelled = false;
     viewEngine
-      .getPageSize(document.id, first)
-      .then(({ width, height }) => {
+      .getPageSize(document.id, first, extraRot)
+      .then(({ width }) => {
         if (cancelled) return;
-        // 附加旋转 90/270 时宽高互换
-        setBasePageWidth(extraRot % 180 !== 0 ? height : width);
+        setBasePageWidth(width);
       })
       .catch(() => undefined);
     return () => {
