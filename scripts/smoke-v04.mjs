@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
-const electronExe = path.join(root, 'node_modules/electron/dist/electron.exe');
+const electronExe = path.join(root, 'node_modules/electron/dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
 const mainScript = path.join(root, 'scripts/_smoke_v04_main.cjs');
 
 const env = { ...process.env };

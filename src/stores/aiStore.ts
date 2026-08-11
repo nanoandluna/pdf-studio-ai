@@ -353,6 +353,8 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
       let toolRounds = 0;
 
       while (toolRounds < 6) {
+        // 工具循环同样要响应取消（关文档/新请求时停止，避免操作已销毁文档）
+        if (abortStale()) return;
         // 非流式请求以获取 tool calls
         const resp = await provider.chat(
           {
@@ -364,6 +366,7 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
           },
           config
         );
+        if (abortStale()) return;
 
         if (resp.toolCalls && resp.toolCalls.length > 0) {
           toolRounds++;
@@ -372,13 +375,16 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
           set({ toolSteps: steps });
           currentMsgs = [...currentMsgs, { role: 'assistant', content: '', tool_calls: resp.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.arguments) } })) }];
           for (const call of resp.toolCalls) {
+            if (abortStale()) return;
             const result = await registry.execute(call);
+            if (abortStale()) return;
             currentMsgs = [...currentMsgs, { role: 'tool', content: result.output, tool_call_id: call.id }];
             // 收集引用
             if (result.data && Array.isArray((result.data as { pages?: number[] }).pages)) {
               finalCitations = [...finalCitations, ...(result.data as { pages: number[] }).pages];
             }
           }
+          if (abortStale()) return;
           set({ toolSteps: steps.map((s) => ({ ...s, status: 'done' })) });
           continue;
         }

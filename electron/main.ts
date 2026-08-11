@@ -220,19 +220,27 @@ function registerIpc(): void {
     await fs.promises.writeFile(p, Buffer.from(data));
   });
 
-  ipcMain.handle('fs:exists', (_e, p: string) => fs.existsSync(p));
+  ipcMain.handle('fs:exists', (_e, p: string) => isAllowedPath(p) && fs.existsSync(p));
 
   // ---- 最近文件 ----
   ipcMain.handle('recent:list', () => readJson(fileOf('recent-files.json'), []));
 
   ipcMain.handle('recent:add', (_e, entry) => {
+    // 只接受 .pdf 路径（PDF 应用语义），防止 renderer 用任意路径喂白名单。
+    // 严格"必须已在白名单"会阻断 dialog 之外的合法打开（如冒烟/自动化），
+    // 折中：扩展名白名单把攻击面从"任意文件"收窄到"PDF 文件"。
+    const p = entry?.path;
+    if (typeof p !== 'string' || !p || path.extname(p).toLowerCase() !== '.pdf') {
+      // 非法输入：拒绝写入，返回当前列表
+      return readJson<unknown[]>(fileOf('recent-files.json'), []);
+    }
     const list = readJson<{ path: string; name: string; lastOpenedAt: number; pageCount?: number }[]>(
       fileOf('recent-files.json'), []
     );
     const next = [entry, ...list.filter((f) => f.path !== entry.path)].slice(0, 20);
     writeJson(fileOf('recent-files.json'), next);
     // 最近文件路径加入白名单（允许从最近列表重新打开）
-    allowPath(entry?.path);
+    allowPath(p);
     // 标记不可用
     const withAvailability = next.map((f) => ({
       ...f,

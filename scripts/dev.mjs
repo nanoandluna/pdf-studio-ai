@@ -61,7 +61,7 @@ async function startElectron(url: string): Promise<void> {
   // 1) 打包 main + preload
   await import('./build-main.mjs');
 
-  const electronExe = path.join(root, 'node_modules/electron/dist/electron.exe');
+  const electronExe = path.join(root, 'node_modules/electron/dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
   if (!fs.existsSync(electronExe)) {
     throw new Error(`未找到 electron.exe：${electronExe}，请先运行 npm install`);
   }

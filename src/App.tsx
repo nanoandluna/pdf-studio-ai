@@ -68,6 +68,8 @@ export default function App(): JSX.Element {
       searchIndex.clear();
       return;
     }
+    // 文档切换（A→B）时先清掉上一份文档的索引，避免跨文档污染
+    searchIndex.clear();
     const loadText = async () => {
       try {
         const { viewEngine } = await import('@stores/documentStore');

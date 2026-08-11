@@ -10,7 +10,7 @@ import * as fs from 'node:fs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 
-const electronExe = path.join(root, 'node_modules/electron/dist/electron.exe');
+const electronExe = path.join(root, 'node_modules/electron/dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
 if (!fs.existsSync(electronExe)) {
   throw new Error(`未找到 electron.exe：${electronExe}`);
 }

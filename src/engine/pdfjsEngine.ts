@@ -127,6 +127,8 @@ export class PdfjsViewEngine implements PdfViewEngine {
     const result = new Map<number, string>();
     const pages = pageIndex === undefined ? Array.from({ length: doc.numPages }, (_, i) => i) : [pageIndex];
     for (const idx of pages) {
+      // 文档已被 dispose → 提前返回已提取部分，避免撞上销毁中的 doc
+      if (!this.docs.has(docId)) break;
       const page = await this.getPage(docId, idx);
       const tc = await page.getTextContent();
       const text = tc.items
