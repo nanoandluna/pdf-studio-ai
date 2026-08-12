@@ -48,12 +48,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Yuan1z0825/pdf-studio-ai.git"
+    "url": "https://github.com/nanoandluna/pdf-studio-ai.git"
   },
   "bugs": {
-    "url": "https://github.com/Yuan1z0825/pdf-studio-ai/issues"
+    "url": "https://github.com/nanoandluna/pdf-studio-ai/issues"
   },
-  "homepage": "https://github.com/Yuan1z0825/pdf-studio-ai#readme",
+  "homepage": "https://github.com/nanoandluna/pdf-studio-ai#readme",
   "keywords": [
     "pdf",
     "electron",
