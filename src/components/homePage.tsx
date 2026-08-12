@@ -56,7 +56,7 @@ export function HomePage(): JSX.Element {
         <p className="mt-3 text-xs text-fg-subtle">或将 PDF 拖拽到窗口</p>
 
         {files.length > 0 && (
-          <div className="mt-10 text-left">
+          <div className="mt-8 text-left">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">最近文件</span>
               <button
@@ -66,7 +66,9 @@ export function HomePage(): JSX.Element {
                 清空
               </button>
             </div>
-            <div className="space-y-1">
+            {/* 限高滚动：避免空状态时长列表撑满视野 */}
+            <div className="max-h-[min(420px,45vh)] overflow-y-auto rounded-lg pr-1">
+              <div className="space-y-1">
               {files.map((f) => (
                 <div
                   key={f.path}
@@ -99,6 +101,7 @@ export function HomePage(): JSX.Element {
                   </button>
                 </div>
               ))}
+              </div>
             </div>
           </div>
         )}

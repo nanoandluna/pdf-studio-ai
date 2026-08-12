@@ -94,45 +94,54 @@ export function Toolbar({ onOpenPalette }: { onOpenPalette?: () => void }): JSX.
 
       <div className="divider-y mx-1.5" />
 
-      {/* 撤销重做 */}
-      <ToolButton title="撤销 (Ctrl+Z)" onClick={() => undo()} disabled={!docLoaded}>
-        <IconUndo width={15} height={15} />
-      </ToolButton>
-      <ToolButton title="重做 (Ctrl+Shift+Z)" onClick={() => redo()} disabled={!docLoaded}>
-        <IconRedo width={15} height={15} />
-      </ToolButton>
+      {/* 撤销重做（仅文档已打开时显示，避免空状态工具栏冗余） */}
+      {docLoaded && (
+        <>
+          <ToolButton title="撤销 (Ctrl+Z)" onClick={() => undo()} disabled={!docLoaded}>
+            <IconUndo width={15} height={15} />
+          </ToolButton>
+          <ToolButton title="重做 (Ctrl+Shift+Z)" onClick={() => redo()} disabled={!docLoaded}>
+            <IconRedo width={15} height={15} />
+          </ToolButton>
+          <div className="divider-y mx-1.5" />
+        </>
+      )}
 
-      <div className="divider-y mx-1.5" />
-
-      {/* 翻页 */}
-      <ToolButton title="上一页 (PageUp)" onClick={() => prevPage()} disabled={!docLoaded}>
-        <IconChevronLeft width={15} height={15} />
-      </ToolButton>
-      <div className="flex items-center gap-1">
-        <input
-          className="h-7 w-12 rounded-md bg-app-panel-hover text-center text-[13px] text-fg outline-none transition-colors focus:bg-app-panel-active"
-          value={currentPage + 1}
-          min={1}
-          max={document?.pageCount ?? 1}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
-            if (!isNaN(v) && v >= 1) gotoPage(v);
-          }}
-        />
-        <span className="text-xs text-fg-subtle">/ {document?.pageCount ?? 0}</span>
-      </div>
-      <ToolButton title="下一页 (PageDown)" onClick={() => nextPage()} disabled={!docLoaded}>
-        <IconChevronRight width={15} height={15} />
-      </ToolButton>
+      {/* 翻页（仅文档已打开时显示） */}
+      {docLoaded && (
+        <>
+          <ToolButton title="上一页 (PageUp)" onClick={() => prevPage()} disabled={!docLoaded}>
+            <IconChevronLeft width={15} height={15} />
+          </ToolButton>
+          <div className="flex items-center gap-1">
+            <input
+              className="h-7 w-12 rounded-md bg-app-panel-hover text-center text-[13px] text-fg outline-none transition-colors focus:bg-app-panel-active"
+              value={currentPage + 1}
+              min={1}
+              max={document?.pageCount ?? 1}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 1) gotoPage(v);
+              }}
+            />
+            <span className="text-xs text-fg-subtle">/ {document?.pageCount ?? 0}</span>
+          </div>
+          <ToolButton title="下一页 (PageDown)" onClick={() => nextPage()} disabled={!docLoaded}>
+            <IconChevronRight width={15} height={15} />
+          </ToolButton>
+        </>
+      )}
 
       {/* 缩放（低频 → 更多菜单） */}
 
       <div className="flex-1" />
 
-      {/* 搜索 */}
-      <ToolButton title="搜索 (Ctrl+F)" onClick={() => setSearchOpen(true)} disabled={!docLoaded}>
-        <IconSearch width={15} height={15} />
-      </ToolButton>
+      {/* 搜索（仅文档已打开时显示） */}
+      {docLoaded && (
+        <ToolButton title="搜索 (Ctrl+F)" onClick={() => setSearchOpen(true)} disabled={!docLoaded}>
+          <IconSearch width={15} height={15} />
+        </ToolButton>
+      )}
 
       {/* 更多菜单 */}
       <div className="relative">
