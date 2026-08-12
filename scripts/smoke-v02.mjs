@@ -11,6 +11,8 @@ const mainScript = path.join(root, 'scripts/_smoke_v02_main.cjs');
 const env = { ...process.env };
 delete env['ELECTRON_RUN_AS_NODE'];
 delete env['NODE_OPTIONS'];
+// 测试注入：fixture 预加载到主进程白名单（recent:add 收紧后冒烟仍可读文件）
+env.SMOKE_FIXTURES = path.join(root, 'tests/fixtures/sample-multi-page.pdf');
 
 const child = spawn(electronExe, [mainScript, '--no-sandbox', '--disable-gpu'], {
   cwd: root,

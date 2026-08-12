@@ -32,7 +32,7 @@ node scripts/smoke-v04.mjs     # V0.4 冒烟（Action Proposal/Insights）
 
 ## 提交 PR 前检查
 
-1. `npm test` 全绿（当前基线 136/136）
+1. `npm test` 全绿（当前基线 175/175）
 2. `npx tsc --noEmit` 0 错误
 3. `npm run build` 成功
 4. 如果改了渲染/交互逻辑，跑相关 smoke

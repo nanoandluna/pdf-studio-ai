@@ -8,7 +8,11 @@
 
 本地优先的 PDF 工作台：查看、页面管理、合并拆分、OCR、AI Copilot。V0.4 完成 AI Workspace（Context Engine + Action Proposal + Document Intelligence），全量测试 175/175 通过。
 
+**平台定位：Windows-first**（Windows x64 为主要目标平台；开发环境与打包配置均以 Windows 为准）。
+
 **产品模型：PDF 是画布，AI 是副驾驶，用户掌握最终控制权 —— 所有 AI 修改都可确认、可撤销，PDF 数据本身永远优先于 AI。**
+
+> **兼容性说明**：PDF 渲染（pdf.js）与 PDF 编辑/导出（pdf-lib）使用不同的引擎。少数格式异常或不常见的 PDF 可能**能正常渲染但编辑/保存失败**——这是引擎容错差异导致的正常现象，不是软件故障。
 
 ---
 
@@ -104,6 +108,8 @@ pdf-studio-ai/
 ```
 
 ## 安装
+
+> **单文件大小上限：100 MB**（超出会提示"文件过大"）。对于个人桌面 PDF 工具这是有意的保护措施。
 
 ```bash
 npm install

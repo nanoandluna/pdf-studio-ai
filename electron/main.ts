@@ -226,11 +226,11 @@ function registerIpc(): void {
   ipcMain.handle('recent:list', () => readJson(fileOf('recent-files.json'), []));
 
   ipcMain.handle('recent:add', (_e, entry) => {
-    // 只接受 .pdf 路径（PDF 应用语义），防止 renderer 用任意路径喂白名单。
-    // 严格"必须已在白名单"会阻断 dialog 之外的合法打开（如冒烟/自动化），
-    // 折中：扩展名白名单把攻击面从"任意文件"收窄到"PDF 文件"。
+    // 安全收紧（OSS 审查 P0）：只有「已在白名单」的路径才允许加入最近文件。
+    // 白名单来源 = 本会话 dialog 成功打开过 + 启动时预加载的既有 recent 路径。
+    // renderer 无法用任意 .pdf 路径给白名单“开新入口”。
     const p = entry?.path;
-    if (typeof p !== 'string' || !p || path.extname(p).toLowerCase() !== '.pdf') {
+    if (typeof p !== 'string' || !p || path.extname(p).toLowerCase() !== '.pdf' || !isAllowedPath(p)) {
       // 非法输入：拒绝写入，返回当前列表
       return readJson<unknown[]>(fileOf('recent-files.json'), []);
     }
@@ -314,6 +314,13 @@ if (!gotLock) {
       for (const f of recent) if (f?.path) allowPath(f.path);
     } catch {
       // 忽略预加载失败
+    }
+    // 测试注入：冒烟脚本通过 SMOKE_FIXTURES 显式预加载 fixture 到白名单
+    // （生产环境无此 env，不影响安全边界）
+    if (process.env.SMOKE_FIXTURES) {
+      for (const p of process.env.SMOKE_FIXTURES.split(',')) {
+        if (p) allowPath(p);
+      }
     }
     registerIpc();
     createMenu();
