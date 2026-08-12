@@ -68,7 +68,7 @@
 
 | 层 | 技术 |
 |---|---|
-| Desktop | Electron 33（环境无 Rust/MSVC，原规划 Tauri 2 切换） |
+| Desktop | Electron 33 |
 | Frontend | React 18 + TypeScript + Vite 6 |
 | UI | Design Tokens（CSS Variables）+ Tailwind CSS 3 + 自写组件库 |
 | State | Zustand（7 个 store：document/viewer/editor/ai/settings/workspace/recent） |
@@ -107,23 +107,26 @@ pdf-studio-ai/
 └── docs/                 # TASKS.md / DESIGN-SYSTEM.md
 ```
 
-## 安装
+## 下载与安装
 
-> **单文件大小上限：100 MB**（超出会提示"文件过大"）。对于个人桌面 PDF 工具这是有意的保护措施。
+**推荐直接下载预构建版本**（无需安装 Node.js）：
+
+[📥 下载 Windows 便携版 v0.4.0](https://github.com/nanoandluna/pdf-studio-ai/releases/tag/v0.4.0)
+
+- `PDF.Studio.AI-0.4.0-portable.exe`（约 83 MB，绿色便携版，双击即用）
+- Windows 可能提示 SmartScreen（未签名），选择「更多信息 → 仍要运行」
+
+> **单文件大小上限：100 MB** —— 超出会提示"文件过大"，这是有意的保护措施。
+
+## 从源码构建
 
 ```bash
-npm install
+npm install        # 安装依赖
+npm run dev        # 开发模式（Vite + Electron）
+npm test           # 全量单元测试
+npm run build      # 生产构建
+npm run pack       # 打包 portable exe（输出到 release/）
 ```
-
-> 沙箱环境下请用 `scripts/install-deps.sh`（已写好绕过 npm safe-delete 与路径问题）。
-
-## 开发
-
-```bash
-npm run dev
-```
-
-启动 Vite dev server 并拉起 Electron 窗口。
 
 ## 测试
 
