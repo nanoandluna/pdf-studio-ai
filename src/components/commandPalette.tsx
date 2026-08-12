@@ -194,7 +194,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   return (
     <div className="fixed inset-0 z-[9500] flex items-start justify-center pt-[15vh]">
-      <div className="absolute inset-0 bg-app-overlay-backdrop backdrop-blur-[3px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-app-overlay-backdrop backdrop-blur-xl backdrop-saturate-150" onClick={onClose} />
       <div
         className="relative w-[560px] max-w-[90vw] overflow-hidden rounded-xl bg-app-dialog shadow-elev3 ring-1 ring-app-popover-border/60"
         style={{ animation: 'palette-in 0.15s ease' }}

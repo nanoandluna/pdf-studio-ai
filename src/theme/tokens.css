@@ -39,7 +39,7 @@
   /* ---- L4 Dialog（模态面板：Command Palette / 对话框 —— 最高层级表面） ---- */
   --surface-dialog: 222 15% 20%;
   /* ---- Backdrop（独立于 Surface：负责压暗背景，PDF 内容不得透进浮层） ---- */
-  --overlay-backdrop: rgb(0 0 0 / 0.62);
+  --overlay-backdrop: rgb(0 0 0 / 0.72);
   /* ---- 浮层边界（高对比但不用厚重边框） ---- */
   --popover-border: 222 12% 24%;
 
@@ -104,7 +104,7 @@
   /* L3/L4：亮色主题浮层用纯白 + 阴影/边界区分（层级靠阴影不靠颜色） */
   --surface-popover: 0 0% 100%;
   --surface-dialog: 0 0% 100%;
-  --overlay-backdrop: rgb(15 20 30 / 0.4);
+  --overlay-backdrop: rgb(15 20 30 / 0.5);
   --popover-border: 40 12% 80%;
 
   --divider: 40 12% 90%;
@@ -154,7 +154,7 @@
 
   --surface-popover: 226 45% 15%;
   --surface-dialog: 226 45% 19%;
-  --overlay-backdrop: rgb(0 0 0 / 0.64);
+  --overlay-backdrop: rgb(0 0 0 / 0.74);
   --popover-border: 226 40% 24%;
 
   --divider: 226 42% 14%;
@@ -204,7 +204,7 @@
 
   --surface-popover: 250 28% 18%;
   --surface-dialog: 250 28% 22%;
-  --overlay-backdrop: rgb(0 0 0 / 0.64);
+  --overlay-backdrop: rgb(0 0 0 / 0.74);
   --popover-border: 250 22% 26%;
 
   --divider: 250 22% 16%;

@@ -39,7 +39,7 @@ export function Dialog({
   return (
     <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-app-overlay-backdrop backdrop-blur-[3px]"
+        className="absolute inset-0 bg-app-overlay-backdrop backdrop-blur-xl backdrop-saturate-150"
         onClick={onClose}
       />
       <div

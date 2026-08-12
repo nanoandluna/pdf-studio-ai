@@ -1,9 +1,9 @@
+/* Design Tokens（必须在 @tailwind 之前，否则 Vite/postcss 忽略导入 → 所有 token 未定义） */
+@import './theme/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Design Tokens（4 套主题变量） */
-@import './theme/tokens.css';
 
 @layer base {
   :root {
