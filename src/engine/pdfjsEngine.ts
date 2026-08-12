@@ -97,6 +97,17 @@ export class PdfjsViewEngine implements PdfViewEngine {
     return { width: viewport.width, height: viewport.height };
   }
 
+  /**
+   * 获取页面「原始（不含任何旋转）」尺寸 + 自带旋转角。
+   * 用于布局 placeholder：Layout 必须与 Render 分离，
+   * 未渲染页也需要真实比例的稳定高度（v0.4.0 rendering hotfix）。
+   */
+  async getRawPageSize(docId: string, pageIndex: number): Promise<{ width: number; height: number; rotate: number }> {
+    const page = await this.getPage(docId, pageIndex);
+    const viewport = page.getViewport({ scale: 1, rotation: 0 });
+    return { width: viewport.width, height: viewport.height, rotate: page.rotate };
+  }
+
   async renderPage(
     docId: string,
     pageIndex: number,

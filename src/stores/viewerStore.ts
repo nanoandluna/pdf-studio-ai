@@ -8,6 +8,12 @@ export type ZoomMode = 'fit-width' | 'fit-page' | 'custom';
 
 interface ViewerState {
   currentPage: number; // 0-based 当前可见页（原索引）
+  /**
+   * 用户显式导航目标（0-based）：缩略图点击 / 页码 / AI citation / 搜索跳转。
+   * 与 currentPage 分离 —— passive 滚动检测只更新 currentPage 不触发滚动；
+   * 只有 navigateTo 设置 navTarget（v0.4.0 rendering hotfix：currentPage 不再强制 scroll）
+   */
+  navTarget: number | null;
   scale: number; // 当前缩放
   zoomMode: ZoomMode;
   /** 是否显示搜索栏 */
@@ -22,10 +28,15 @@ interface ViewerState {
   /** 框选文本（Selected Text → AI） */
   selection: { pageIndex: number; text: string; x: number; y: number; width: number; height: number } | null;
 
+  /** 被动设置当前页（滚动检测/点击页面），不触发滚动 */
   setCurrentPage: (page: number) => void;
+  /** 用户显式导航（缩略图/页码/citation/搜索）→ 更新当前页 + navTarget（触发滚动定位） */
+  navigateTo: (page: number) => void;
+  /** 清除导航目标（viewer 消费后调用） */
+  clearNavTarget: () => void;
   nextPage: () => void;
   prevPage: () => void;
-  gotoPage: (page: number) => void; // 1-based
+  gotoPage: (page: number) => void; // 1-based，等价 navigateTo
   setScale: (scale: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -45,6 +56,7 @@ const MAX_SCALE = 4;
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
   currentPage: 0,
+  navTarget: null,
   scale: 1,
   zoomMode: 'fit-width',
   searchOpen: false,
@@ -55,6 +67,12 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selection: null,
 
   setCurrentPage: (page) => set({ currentPage: page }),
+
+  navigateTo: (page) => {
+    set({ currentPage: page, navTarget: page });
+  },
+
+  clearNavTarget: () => set({ navTarget: null }),
 
   nextPage: () => {
     const { currentPage } = get();
@@ -67,7 +85,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   },
 
   gotoPage: (page) => {
-    set({ currentPage: Math.max(0, page - 1) });
+    set({ currentPage: Math.max(0, page - 1), navTarget: Math.max(0, page - 1) });
   },
 
   setScale: (scale) => {

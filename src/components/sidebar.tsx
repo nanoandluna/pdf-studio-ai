@@ -21,7 +21,7 @@ type Section = 'file' | 'pages' | 'tools';
 
 export function Sidebar(): JSX.Element | null {
   const { document, pageOrder, deletedPages, thumbnails, pageRotations, deletePages, rotatePages, extractPages, reorderPages } = useDocumentStore();
-  const { currentPage, gotoPage, selectedPages, selectPage, clearSelection, setCurrentPage } = useViewerStore();
+  const { currentPage, navigateTo, selectedPages, selectPage, clearSelection } = useViewerStore();
   const { sidebarCollapsed, toggleSidebar } = useWorkspaceStore();
   const setSettingsOpen = useAiStore((s) => s.setSettingsOpen);
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -202,8 +202,8 @@ export function Sidebar(): JSX.Element | null {
                     }}
                     onClick={(e) => {
                       selectPage(origIndex, e.ctrlKey || e.metaKey || e.shiftKey);
-                      gotoPage(origIndex);
-                      setCurrentPage(origIndex);
+                      // 用户显式导航：navigateTo 设置 navTarget（触发滚动定位到正确页）
+                      navigateTo(origIndex);
                     }}
                     onContextMenu={(e) => onContextMenu(e, origIndex)}
                     className={`group relative cursor-pointer overflow-hidden rounded-lg p-1 transition-all

@@ -36,6 +36,12 @@ interface DocumentState {
   pageOrder: number[];
   /** 每页附加旋转（原索引 → 角度） */
   pageRotations: Record<number, number>;
+  /**
+   * 每页原始尺寸（scale=1 无旋转）+ 自带旋转角。
+   * Layout 与 Render 分离：页面未渲染时也用真实比例占位，
+   * 滚动布局稳定，不随 canvas 是否渲染而变（v0.4.0 rendering hotfix）。
+   */
+  pageSizes: Record<number, { w: number; h: number; rotate: number }>;
   /** 已删除页（原索引集合） */
   deletedPages: Set<number>;
   /** 标注（按原页索引） */
@@ -79,6 +85,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   document: null,
   pageOrder: [],
   pageRotations: {},
+  pageSizes: {},
   deletedPages: new Set(),
   annotations: [],
   thumbnails: [],
@@ -130,10 +137,23 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       sourceBytes = data;
       sourcePath = path;
       const pageCount = doc.pageCount;
+      // 预取每页原始尺寸（布局 placeholder，与渲染无关 —— Layout/Render 分离）
+      const sizes: Record<number, { w: number; h: number; rotate: number }> = {};
+      await Promise.all(
+        Array.from({ length: pageCount }, (_, i) =>
+          viewEngine
+            .getRawPageSize(doc.id, i)
+            .then((s) => {
+              sizes[i] = { w: s.width, h: s.height, rotate: s.rotate };
+            })
+            .catch(() => undefined)
+        )
+      );
       set({
         document: doc,
         pageOrder: Array.from({ length: pageCount }, (_, i) => i),
         pageRotations: {},
+        pageSizes: sizes,
         deletedPages: new Set(),
         annotations: [],
         thumbnails: [],
@@ -168,6 +188,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       document: null,
       pageOrder: [],
       pageRotations: {},
+      pageSizes: {},
       deletedPages: new Set(),
       annotations: [],
       thumbnails: [],

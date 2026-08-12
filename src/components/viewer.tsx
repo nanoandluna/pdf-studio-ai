@@ -12,10 +12,11 @@ import { useWorkspaceStore } from '@stores/workspaceStore';
 import type { Annotation } from '@domain/types';
 import { SearchBar } from './searchBar';
 import { IconSpark } from './icons';
+import { calculateLayoutSize, calculateRenderRange, buildRenderKey } from './viewerMath';
 
 export function Viewer(): JSX.Element {
-  const { document, pageOrder, deletedPages, pageRotations, annotations, addAnnotation, updateAnnotation, removeAnnotation } = useDocumentStore();
-  const { scale, zoomMode, currentPage, setCurrentPage, tool, setTool } = useViewerStore();
+  const { document, pageOrder, deletedPages, pageRotations, pageSizes, annotations, addAnnotation, updateAnnotation, removeAnnotation } = useDocumentStore();
+  const { scale, zoomMode, currentPage, navTarget, setCurrentPage, clearNavTarget, tool, setTool } = useViewerStore();
   const editor = useEditorStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -32,7 +33,7 @@ export function Viewer(): JSX.Element {
   const [basePageWidth, setBasePageWidth] = useState<number>(612); // pt，默认 Letter
   const effectiveScale = useMemo(() => {
     if (zoomMode === 'fit-width' && containerWidth > 0 && document) {
-      // 留 48px 左右边距，让页面尽量大
+      // 留 56px 左右边距，让页面尽量大
       return Math.max(0.1, (containerWidth - 56) / basePageWidth);
     }
     if (zoomMode === 'fit-page') {
@@ -40,9 +41,6 @@ export function Viewer(): JSX.Element {
     }
     return scale;
   }, [zoomMode, containerWidth, scale, document, basePageWidth]);
-
-  // 页面渲染状态
-  const [renderedSizes, setRenderedSizes] = useState<Record<number, { w: number; h: number }>>({});
 
   // 用第一页的固有尺寸（scale=1）校准 Fit Width 基准。
   // 注意：不能用渲染后的尺寸 —— renderedSizes → basePageWidth → effectiveScale → 重渲染
@@ -78,46 +76,100 @@ export function Viewer(): JSX.Element {
     return () => ro.disconnect();
   }, []);
 
-  const canvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
+  // ============ Layout 与 Render 分离（v0.4.0 rendering hotfix）============
+  // 布局尺寸 = pageSizes（原始尺寸）× effectiveScale（含总旋转），与页面是否
+  // 已渲染无关 —— 未渲染页也有真实比例的稳定高度，滚动布局不随渲染而变。
+  const layoutSizeOf = useCallback(
+    (pageIdx: number): { w: number; h: number } =>
+      calculateLayoutSize(pageSizes[pageIdx], pageRotations[pageIdx] ?? 0, effectiveScale),
+    [pageSizes, pageRotations, effectiveScale]
+  );
 
-  const renderAll = useCallback(async () => {
-    if (!document) return;
-    // 只渲染可见页（当前页 ± 预取 2 页）
-    const target = new Set<number>();
-    const idx = visiblePageIndexes.indexOf(currentPage);
-    if (idx >= 0) {
-      for (let k = Math.max(0, idx - 2); k <= Math.min(visiblePageIndexes.length - 1, idx + 2); k++) {
-        target.add(visiblePageIndexes[k]);
-      }
+  const canvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
+  const renderGenRef = useRef(0);
+  // 渲染目标：由滚动位置计算（viewport proximity），与 currentPage 解耦
+  const [renderTarget, setRenderTarget] = useState<Set<number>>(new Set());
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+  const rafRef = useRef(0);
+  const GAP = 28; // gap-7（页间距）
+
+  // 滚动 → 计算可见页 ± 预取 + passive 更新当前页（不触发滚动）
+  const updateFromScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el || visiblePageIndexes.length === 0 || !document) return;
+    const { target, currentPage: current } = calculateRenderRange(
+      visiblePageIndexes,
+      pageSizes,
+      pageRotations,
+      effectiveScale,
+      el.scrollTop,
+      el.clientHeight
+    );
+    const key = target.join(',');
+    setRenderTarget((prev) => {
+      const prevKey = Array.from(prev).sort((a, b) => a - b).join(',');
+      return prevKey === key ? prev : new Set(target);
+    });
+    if (current >= 0 && current !== currentPageRef.current) {
+      setCurrentPage(current); // passive：只更新高亮/缩略图，不滚动
     }
-    for (const pageIdx of visiblePageIndexes) {
+  }, [visiblePageIndexes, pageSizes, pageRotations, effectiveScale, document, setCurrentPage]);
+
+  const handleScroll = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      updateFromScroll();
+    });
+  }, [updateFromScroll]);
+
+  // 布局变化（scale/旋转/文档/容器宽度）时重新计算可见范围
+  useEffect(() => {
+    updateFromScroll();
+  }, [updateFromScroll, containerWidth]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  // renderAll：只渲染 renderTarget 内的页（首帧等容器宽度就绪，避免低分辨率首帧）
+  const renderAll = useCallback(async () => {
+    if (!document || containerWidth <= 0) return;
+    const gen = ++renderGenRef.current;
+    const list = Array.from(renderTarget);
+    for (const pageIdx of list) {
+      if (renderGenRef.current !== gen) return; // 已被新一轮取代
       const canvas = canvasRefs.current[pageIdx];
       if (!canvas) continue;
-      if (!target.has(pageIdx)) continue;
       const extraRot = pageRotations[pageIdx] ?? 0;
+      // render dedup：同页同 scale 同旋转不重复渲染
+      const renderKey = buildRenderKey(pageIdx, effectiveScale, extraRot);
+      if (canvas.dataset.renderKey === renderKey) continue;
       try {
         const size = await viewEngine.renderPage(document.id, pageIdx, effectiveScale, canvas, extraRot);
-        setRenderedSizes((s) => ({ ...s, [pageIdx]: { w: size.width, h: size.height } }));
+        if (renderGenRef.current !== gen) return; // 旧渲染结果丢弃
+        canvas.dataset.renderKey = renderKey;
+        void size; // 布局尺寸已由 pageSizes × scale 提供，渲染结果仅作确认
       } catch {
-        // 忽略渲染错误
+        // 忽略渲染错误（可能被新渲染取消）
       }
     }
-  }, [document, visiblePageIndexes, currentPage, effectiveScale, pageRotations]);
+  }, [document, renderTarget, effectiveScale, pageRotations, containerWidth]);
 
   useEffect(() => {
     renderAll();
   }, [renderAll]);
 
-  // 滚动到当前页
-  const scrollToPage = useCallback((pageIdx: number) => {
-    const el = containerRef.current?.querySelector(`[data-page="${pageIdx}"]`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
-
+  // 用户显式导航（缩略图/页码/citation/搜索）→ 定位；passive 滚动不触发滚动
   useEffect(() => {
-    const timer = setTimeout(() => scrollToPage(currentPage), 50);
-    return () => clearTimeout(timer);
-  }, [currentPage, scrollToPage]);
+    if (navTarget === null) return;
+    const el = containerRef.current?.querySelector(`[data-page="${navTarget}"]`);
+    el?.scrollIntoView({ behavior: 'auto', block: 'start' });
+    clearNavTarget();
+  }, [navTarget, clearNavTarget]);
 
   if (!document) {
     return (
@@ -184,25 +236,29 @@ export function Viewer(): JSX.Element {
         className="flex-1 overflow-auto px-8 py-8"
         style={{ background: 'hsl(var(--background))' }}
         onWheel={handleWheel}
+        onScroll={handleScroll}
         onMouseDown={() => {
           // 点击空白清除选择
         }}
       >
         <div className="mx-auto flex w-fit flex-col items-center gap-7">
-          {visiblePageIndexes.map((pageIdx) => (
-            <PageCanvas
-              key={pageIdx}
-              pageIdx={pageIdx}
-              containerWidth={containerWidth}
-              effectiveScale={effectiveScale}
-              isCurrent={pageIdx === currentPage}
-              rotation={pageRotations[pageIdx] ?? 0}
-              annotations={annotations.filter((a) => a.pageIndex === pageIdx)}
-              size={renderedSizes[pageIdx]}
-              onCanvasRef={(c) => (canvasRefs.current[pageIdx] = c)}
-              onPageClick={() => setCurrentPage(pageIdx)}
-            />
-          ))}
+          {visiblePageIndexes.map((pageIdx) => {
+            const ls = layoutSizeOf(pageIdx);
+            return (
+              <PageCanvas
+                key={pageIdx}
+                pageIdx={pageIdx}
+                layoutW={ls.w}
+                layoutH={ls.h}
+                effectiveScale={effectiveScale}
+                isCurrent={pageIdx === currentPage}
+                rotation={pageRotations[pageIdx] ?? 0}
+                annotations={annotations.filter((a) => a.pageIndex === pageIdx)}
+                onCanvasRef={(c) => (canvasRefs.current[pageIdx] = c)}
+                onPageClick={() => setCurrentPage(pageIdx)}
+              />
+            );
+          })}
         </div>
       </div>
       {/* 编辑工具栏（覆盖在右下角） */}
@@ -222,22 +278,24 @@ export function Viewer(): JSX.Element {
 
 function PageCanvas({
   pageIdx,
-  containerWidth,
+  layoutW,
+  layoutH,
   effectiveScale,
   isCurrent,
   rotation,
   annotations,
-  size,
   onCanvasRef,
   onPageClick,
 }: {
   pageIdx: number;
-  containerWidth: number;
+  /** 布局宽度（= 原始页宽 × scale，含旋转）—— Layout 与 Render 分离 */
+  layoutW: number;
+  /** 布局高度（= 原始页高 × scale，含旋转） */
+  layoutH: number;
   effectiveScale: number;
   isCurrent: boolean;
   rotation: number;
   annotations: Annotation[];
-  size?: { w: number; h: number };
   onCanvasRef: (c: HTMLCanvasElement | null) => void;
   onPageClick: () => void;
 }): JSX.Element {
@@ -246,8 +304,9 @@ function PageCanvas({
   const { setTool, tool } = useViewerStore();
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const w = size?.w ?? 600;
-  const h = size?.h ?? 800;
+  // 页面逻辑尺寸（svg overlay 坐标系）：与布局尺寸一致（未渲染时也正确）
+  const w = layoutW;
+  const h = layoutH;
 
   const normToSvg = (p: { x: number; y: number }) => ({ x: p.x * w, y: p.y * h });
 
@@ -375,9 +434,10 @@ function PageCanvas({
     <div
       data-page={pageIdx}
       onClick={onPageClick}
+      style={{ width: layoutW, height: layoutH }}
       className={`relative rounded-[2px] transition-shadow ${isCurrent ? 'shadow-elev2 ring-1 ring-accent/40' : 'shadow-elev1 hover:shadow-elev2'}`}
     >
-      <canvas ref={onCanvasRef} className="block rounded-[2px] bg-white" />
+      <canvas ref={onCanvasRef} className="absolute inset-0 h-full w-full rounded-[2px] bg-white" />
       <svg
         ref={svgRef}
         className="absolute inset-0 h-full w-full"

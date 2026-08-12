@@ -19,6 +19,8 @@ export interface PdfViewEngine {
   ): Promise<{ width: number; height: number; rotation: number }>;
   /** 获取页面尺寸（按总旋转 page.rotate + extraRotation 后的可视维度） */
   getPageSize(documentId: string, pageIndex: number, extraRotation?: number): Promise<{ width: number; height: number }>;
+  /** 获取页面原始尺寸（无旋转）与自带旋转角 —— 供布局 placeholder 使用 */
+  getRawPageSize(documentId: string, pageIndex: number): Promise<{ width: number; height: number; rotate: number }>;
   extractText(documentId: string, pageIndex?: number): Promise<Map<number, string>>;
   /** 全文搜索，返回所有匹配页 */
   search(documentId: string, query: string): Promise<SearchResult[]>;
