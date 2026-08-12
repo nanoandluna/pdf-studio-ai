@@ -162,7 +162,7 @@ V0.2 冒烟会生成 `theme-obsidian.png` / `theme-paper.png` / `theme-midnight.
 ## 常见问题
 
 **Q：`npm install` 卡住无输出？**
-A：请用 `scripts/install-deps.sh`（项目内 cache + 镜像 + 绕过 npm safe-delete bug）。
+A：通常是网络问题，重试或换用 npm 镜像（如 `npm config set registry https://registry.npmmirror.com`）。
 
 **Q：Electron 启动后立即退出？**
 A：通过 `npm run dev` 启动（脚本已处理 `ELECTRON_RUN_AS_NODE` / `NODE_OPTIONS`）。
