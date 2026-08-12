@@ -12,41 +12,53 @@
 
 ---
 
-## 视觉风格
+## 功能亮点
 
-Linear / Raycast / Arc / Notion 风格的克制专业风；现代暗色 + 暖白阅读 + 高级 AI 四套主题（详见 `docs/DESIGN-SYSTEM.md`）。
+### 📖 PDF 查看与阅读
 
-## 功能
+- 渲染、翻页、跳页、缩放、适合宽度/适合页面、页面缩略图
+- **阅读模式**（Ctrl+Shift+R）：隐藏侧栏和工具栏，最大化 PDF
+- **四套主题**：Obsidian / Paper / Midnight / Aurora，即时切换并持久化
 
-- 📖 **PDF 查看**：渲染、翻页、跳页、缩放、适合宽度/页面、页面缩略图
-- 🗂 **页面管理**：多选、右键菜单、拖拽排序、可撤销删除/旋转
-- 🧲 **合并 PDF**：多选 + 拖拽排序 + 输出
-- ✂️ **拆分 PDF**：全部 / 范围（`1-5, 8, 10-12`）
-- ✏️ **基础编辑**：文本 / 高亮 / 矩形 / 箭头 / 画笔 / 擦除（Overlay）
-- 🔍 **全文搜索**：Ctrl+F，文本层 + OCR 结果合并，跳页跳转
-- 🔎 **OCR**：Tesseract.js WASM（中文），结果入搜索索引
-- 🤖 **PDF Copilot**：OpenAI / DeepSeek / Qwen / Ollama（本地）
-- 🛠 **AI Tools**：Tool Calling（删除/旋转/提取/总结等）
-- 📄 **AI 总结**：Chunk + Map-Reduce + 页码引用
-- 🔗 **AI 引用**：回答附带页码，**点击跳转**
-- 💬 **AI 流式**：逐字显示（Streaming）
-- 🔐 **本地优先**：PDF 默认不上传；API Key 系统安全存储
-- 🌓 **4 套主题**：Obsidian / Paper / Midnight / Aurora —— 即时切换
+### 🗂 页面管理
 
-## V0.2 新增
+- 多选、右键菜单、拖拽排序、可撤销删除/旋转
+- **合并 PDF**：多选 + 拖拽排序 + 输出
+- **拆分 PDF**：全部 / 范围（`1-5, 8, 10-12`）
 
-- **Design Tokens + Theme System**：CSS Variables 驱动 4 套主题即时切换与持久化
-- **Command Palette**：Ctrl+K Raycast 风格命令面板（打开/保存/合并/拆分/总结/主题切换/阅读模式…）
-- **可调宽 + 可折叠工作区**：AI Panel 拖拽调整宽度（320–720px），sidebar / AI Panel 独立折叠
-- **AI Focus 模式**：一键放大 AI Panel（58% 宽度），适合长文档问答
-- **Reading Mode**：Ctrl+Shift+R，隐藏侧栏和工具栏，最大化 PDF
-- **PDF Copilot**：全新 AI Panel 品牌（✦ 符号）+ AIHeader / Model Selector / Privacy Indicator
-- **AI Tool Status**：用户语言状态（✓ 读取 PDF → ● 搜索相关页），无开发者信息
-- **AI 上下文选择器**：当前文档 / 当前页面 / 选中页面 / 选中文字
+### ✏️ 基础编辑（Overlay）
+
+- 文本 / 高亮 / 矩形 / 箭头 / 画笔 / 擦除
+- 标注不破坏原 PDF，保存时重新生成
+
+### 🔍 搜索与 OCR
+
+- **全文搜索**（Ctrl+F）：文本层 + OCR 结果合并，跳页跳转
+- **OCR**：Tesseract.js WASM（中文），结果入搜索索引
+
+### 🤖 AI Copilot（本地优先）
+
+- **Provider 灵活**：OpenAI / DeepSeek / Qwen / Ollama（本地）/ Custom
+- **AI Workspace**：AI Panel 可折叠、可调宽（320–720px）、专注模式
+- **Action Proposal**：AI 提议破坏性操作（删除/旋转/排序/提取）→ 用户确认 → 可撤销
+- **Document Intelligence**（✦ 分析文档）：结构化 JSON 文档分析 + Insights 面板
+- **AI 引用**：回答附带页码，点击跳转
+- **Selected Text → AI**：框选文字 → 浮动工具栏（✦ Ask AI / 翻译 / 解释 / 总结）
+- **AI 总结**：Chunk + Map-Reduce + 页码引用
 - **AI 流式输出**：逐 token 显示
-- **Settings 侧栏式**：通用 / 外观 / AI / PDF / OCR / 快捷键 / 关于
-- **Provider 卡片**：OpenAI / DeepSeek / Qwen / Ollama / Custom 独立配置 + 测试
-- **拖拽打开 PDF**：Viewer 区拖入 PDF 时高亮提示
+- **AI 上下文选择器**：当前文档 / 当前页面 / 选中页面 / 选中文字
+
+### ⌨️ 效率工具
+
+- **Command Palette**（Ctrl+K）：Raycast 风格命令面板
+- **可折叠工作区**：sidebar / AI Panel 独立折叠
+- **拖拽打开 PDF**：Viewer 区拖入 PDF 高亮提示
+
+### 🔐 安全与隐私
+
+- **本地优先**：PDF 默认不上传；API Key 系统安全存储（safeStorage 加密）
+- **浮层可读性**：统一 Surface 层级系统（L0–L5），浮层与背景清晰分层
+- **AI 可控**：所有 AI 修改可确认、可撤销，PDF 数据永远优先
 
 ## 技术栈
 
@@ -78,7 +90,7 @@ pdf-studio-ai/
 │   ├── theme/            # Design Tokens + 4 套主题定义
 │   ├── ai/
 │   │   ├── providers/   # AIProvider Registry（OpenAI/DeepSeek/Qwen/Ollama/Custom）
-│   │   ├── orchestrator.ts # 流式 + Tool 循环
+│   │   ├── context.ts   # Context Engine（统一收集 PDF 上下文）
 │   │   ├── tools.ts     # PDF Tool Calling
 │   │   └── chunk.ts     # Chunk + Map-Reduce
 │   ├── engine/           # PDF Engine 抽象（pdf.js / pdf-lib）
