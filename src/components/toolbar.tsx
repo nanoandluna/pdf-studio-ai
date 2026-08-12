@@ -142,7 +142,7 @@ export function Toolbar({ onOpenPalette }: { onOpenPalette?: () => void }): JSX.
         {moreOpen && (
           <>
             <div className="fixed inset-0 z-[9400]" onClick={() => setMoreOpen(false)} />
-            <div className="absolute right-0 top-full z-[9500] mt-1 w-56 rounded-lg bg-app-elevated p-1 shadow-elev2" style={{ animation: 'dropdown-in 0.12s ease' }}>
+            <div className="absolute right-0 top-full z-[9500] mt-1 w-56 rounded-lg bg-app-popover p-1 shadow-elev2 ring-1 ring-app-popover-border/50" style={{ animation: 'dropdown-in 0.12s ease' }}>
               <MoreMenuItems
                 document={document}
                 onMerge={() => { window.dispatchEvent(new CustomEvent('menu:merge')); setMoreOpen(false); }}

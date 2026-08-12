@@ -531,8 +531,8 @@ function EditToolbarOverlay({ tool, setTool }: { tool: string | null; setTool: (
 
   return (
     <div
-      className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-elev2 backdrop-blur-md"
-      style={{ background: 'color-mix(in srgb, hsl(var(--elevated)) 88%, transparent)' }}
+      className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-elev2 ring-1 ring-app-popover-border/40"
+      style={{ background: 'hsl(var(--surface-popover))' }}
     >
       {tools.map((t) => (
         <button
@@ -632,8 +632,8 @@ function SelectionToolbar(): JSX.Element | null {
 
   return (
     <div
-      className="fixed z-[8000] flex -translate-x-1/2 items-center gap-0.5 rounded-xl px-1 py-0.5 shadow-elev2 backdrop-blur-md"
-      style={{ left: pos.left, top: pos.top, background: 'color-mix(in srgb, hsl(var(--elevated)) 90%, transparent)' }}
+      className="fixed z-[8000] flex -translate-x-1/2 items-center gap-0.5 rounded-xl px-1 py-0.5 shadow-elev2 ring-1 ring-app-popover-border/40"
+      style={{ left: pos.left, top: pos.top, background: 'hsl(var(--surface-popover))' }}
     >
       <span className="mx-1.5 whitespace-nowrap text-[10px] text-fg-subtle">AI Context · Selection · Page {pageLabel}</span>
       <span className="h-4 w-px bg-app-border-faint" />

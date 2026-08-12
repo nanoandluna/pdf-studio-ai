@@ -34,6 +34,15 @@
   --elevation-2: 0 4px 12px rgb(0 0 0 / 0.35), 0 16px 40px -8px rgb(0 0 0 / 0.45);
   --elevation-3: 0 8px 24px rgb(0 0 0 / 0.4), 0 24px 64px -12px rgb(0 0 0 / 0.55);
 
+  /* ---- L3 Popover（浮层：下拉/搜索/菜单/提示 —— 必须盖住背景内容） ---- */
+  --surface-popover: 222 15% 16%;
+  /* ---- L4 Dialog（模态面板：Command Palette / 对话框 —— 最高层级表面） ---- */
+  --surface-dialog: 222 15% 20%;
+  /* ---- Backdrop（独立于 Surface：负责压暗背景，PDF 内容不得透进浮层） ---- */
+  --overlay-backdrop: rgb(0 0 0 / 0.62);
+  /* ---- 浮层边界（高对比但不用厚重边框） ---- */
+  --popover-border: 222 12% 24%;
+
   /* ---- 分隔 / 边界（低对比，几乎不打扰） ---- */
   --divider: 222 12% 14%;              /* 区块间极弱分隔线 */
   --border: 222 10% 18%;               /* 需要真实边界的元素 */
@@ -92,6 +101,12 @@
   --elevation-2: 0 4px 12px rgb(0 0 0 / 0.07), 0 16px 40px -8px rgb(0 0 0 / 0.1);
   --elevation-3: 0 8px 24px rgb(0 0 0 / 0.09), 0 24px 64px -12px rgb(0 0 0 / 0.14);
 
+  /* L3/L4：亮色主题浮层用纯白 + 阴影/边界区分（层级靠阴影不靠颜色） */
+  --surface-popover: 0 0% 100%;
+  --surface-dialog: 0 0% 100%;
+  --overlay-backdrop: rgb(15 20 30 / 0.4);
+  --popover-border: 40 12% 80%;
+
   --divider: 40 12% 90%;
   --border: 40 12% 86%;
   --border-faint: 40 12% 90%;
@@ -137,6 +152,11 @@
   --elevation-2: 0 4px 12px rgb(0 0 0 / 0.45), 0 16px 40px -8px rgb(0 0 0 / 0.55);
   --elevation-3: 0 8px 24px rgb(0 0 0 / 0.5), 0 24px 64px -12px rgb(0 0 0 / 0.65);
 
+  --surface-popover: 226 45% 15%;
+  --surface-dialog: 226 45% 19%;
+  --overlay-backdrop: rgb(0 0 0 / 0.64);
+  --popover-border: 226 40% 24%;
+
   --divider: 226 42% 14%;
   --border: 226 40% 18%;
   --border-faint: 226 42% 14%;
@@ -181,6 +201,11 @@
   --elevation-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px -2px rgb(0 0 0 / 0.4);
   --elevation-2: 0 4px 12px rgb(0 0 0 / 0.45), 0 16px 40px -8px rgb(0 0 0 / 0.5);
   --elevation-3: 0 8px 24px rgb(0 0 0 / 0.5), 0 24px 64px -12px rgb(0 0 0 / 0.6);
+
+  --surface-popover: 250 28% 18%;
+  --surface-dialog: 250 28% 22%;
+  --overlay-backdrop: rgb(0 0 0 / 0.64);
+  --popover-border: 250 22% 26%;
 
   --divider: 250 22% 16%;
   --border: 250 20% 20%;

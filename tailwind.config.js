@@ -12,6 +12,11 @@ export default {
           'panel-hover': 'hsl(var(--surface-hover))',
           'panel-active': 'hsl(var(--surface-active))',
           elevated: 'hsl(var(--elevated))',
+          // L3/L4 浮层表面（Overlay Readability：层级越高越盖住背景）
+          popover: 'hsl(var(--surface-popover))',
+          dialog: 'hsl(var(--surface-dialog))',
+          'popover-border': 'hsl(var(--popover-border))',
+          'overlay-backdrop': 'var(--overlay-backdrop)',
           border: 'hsl(var(--border))',
           'border-faint': 'hsl(var(--border-faint))',
           'border-strong': 'hsl(var(--border-strong))',

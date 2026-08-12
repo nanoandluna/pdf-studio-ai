@@ -55,7 +55,7 @@ export function ContextMenu({ menu, onClose }: ContextMenuProps): JSX.Element | 
   return (
     <div
       ref={ref}
-      className="fixed z-[9500] min-w-[180px] rounded-lg bg-app-elevated p-1 shadow-elev2 animate-[menu-in_.12s_ease]"
+      className="fixed z-[9500] min-w-[180px] rounded-lg bg-app-popover p-1 shadow-elev2 ring-1 ring-app-popover-border/50 animate-[menu-in_.12s_ease]"
       style={{ left: x, top: y, animation: 'menu-in 0.12s ease' }}
     >
       {menu.items.map((item, i) => (

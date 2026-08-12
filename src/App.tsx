@@ -181,7 +181,7 @@ export default function App(): JSX.Element {
         {readingMode && document && (
           <button
             onClick={handleExitReading}
-            className="fixed right-4 top-16 z-[8000] rounded-lg bg-app-elevated px-3 py-1.5 text-xs text-fg shadow-elev2 transition-colors hover:bg-app-panel-hover"
+            className="fixed right-4 top-16 z-[8000] rounded-lg bg-app-popover px-3 py-1.5 text-xs text-fg shadow-elev2 ring-1 ring-app-popover-border/40 transition-colors hover:bg-app-panel-hover"
             title="退出阅读模式 (Ctrl+Shift+R)"
           >
             退出阅读模式

@@ -39,11 +39,11 @@ export function Dialog({
   return (
     <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-app-overlay-backdrop backdrop-blur-[3px]"
         onClick={onClose}
       />
       <div
-        className={`relative ${width} max-h-[85vh] overflow-hidden rounded-xl bg-app-elevated shadow-elev3 animate-[dialog-in_.15s_ease]`}
+        className={`relative ${width} max-h-[85vh] overflow-hidden rounded-xl bg-app-dialog shadow-elev3 ring-1 ring-app-popover-border/60 animate-[dialog-in_.15s_ease]`}
         style={{ animation: 'dialog-in 0.15s ease' }}
       >
         <div className="flex items-center justify-between px-5 py-4">

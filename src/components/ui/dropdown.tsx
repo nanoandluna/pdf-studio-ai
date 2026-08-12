@@ -62,7 +62,7 @@ export function Dropdown({
 
       {open && (
         <div
-          className="absolute left-0 top-full z-[9500] mt-1 max-h-72 w-full min-w-[180px] overflow-y-auto rounded-lg bg-app-elevated p-1 shadow-pop"
+          className="absolute left-0 top-full z-[9500] mt-1 max-h-72 w-full min-w-[180px] overflow-y-auto rounded-lg bg-app-popover p-1 shadow-pop ring-1 ring-app-popover-border/50"
           style={{ animation: 'dropdown-in 0.12s ease' }}
         >
           {Array.from(groups.entries()).map(([group, groupItems]) => (

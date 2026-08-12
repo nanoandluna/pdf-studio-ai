@@ -56,7 +56,7 @@ export function ToastHost(): JSX.Element {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex items-center gap-2.5 rounded-lg bg-app-elevated px-3.5 py-2.5 text-[13px] shadow-elev2"
+          className="pointer-events-auto flex items-center gap-2.5 rounded-lg bg-app-popover px-3.5 py-2.5 text-[13px] shadow-elev2 ring-1 ring-app-popover-border/40"
           style={{ animation: 'toast-in 0.2s ease' }}
         >
           <span className="shrink-0">{ICONS[t.kind]}</span>

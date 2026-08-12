@@ -66,7 +66,7 @@ export function SearchBar(): JSX.Element | null {
   if (!searchOpen || !document) return null;
 
   return (
-    <div className="absolute right-6 top-3 z-30 w-[380px] overflow-hidden rounded-xl bg-app-elevated shadow-elev2">
+    <div className="absolute right-6 top-3 z-30 w-[380px] overflow-hidden rounded-xl bg-app-popover shadow-elev2 ring-1 ring-app-popover-border/50">
       <div className="flex items-center gap-2 px-3.5 py-2.5">
         <IconSearch className="shrink-0 text-fg-subtle" width={14} height={14} />
         <input
