@@ -75,7 +75,8 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      logger.error('AI 请求失败', { status: res.status, body: text.slice(0, 500) });
+      // 最小化日志：只记录状态码，不落 provider 原始响应 body（可能含敏感信息）
+      logger.error('AI 请求失败', { status: res.status });
       if (res.status === 401 || res.status === 403) {
         throw new FriendlyError('API Key 无效或没有权限，请检查设置。', text.slice(0, 300));
       }

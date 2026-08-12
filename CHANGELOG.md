@@ -2,6 +2,26 @@
 
 所有重要变更都记录在此文件中。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0-hotfix] - 2026-08-12
+
+Feature Freeze 后的 Bug / Security / 严重 UX 修复（随 main 分支发布）。
+
+### Fixed
+
+- **安全**：收紧 `recent:add` 白名单入口 —— renderer 无法再用任意 `.pdf` 路径扩充文件白名单，路径必须已由主进程认可（dialog 打开过 / 启动预加载的 recent）
+- **安全**：AI 错误日志最小化 —— 不再记录 provider 原始响应 body（可能含敏感信息），只保留状态码
+- **安全**：Prompt Injection 加固 —— 文档内容在系统提示中声明为「不可信数据」，并包进 `<document_context>` 标签
+- **渲染**：Viewer 滚动驱动渲染 + Layout 与 Render 分离（修复：滚动后页面空白需点击、未显示页前一页翻转、默认尺寸模糊）
+- **渲染**：首帧清晰度 —— 容器宽度就绪前不渲染低分辨率首帧（DPR 诊断实证 ratio 正确）
+- **UI**：浮层可读性 —— 建立 L0–L5 Surface 层级（popover/dialog 不透明 + 毛玻璃 backdrop）
+- **CSS**：修复 `@import` 顺序错误导致 `tokens.css` 未打包（生产构建颜色/浮层全部失效）
+- **UI**：空状态工具栏隐藏无意义控件 + 最近文件区限高
+
+### Added
+
+- **CI**：`.github/workflows/ci.yml`（push/PR → Node 20 → `tsc` → `test` → `build`）
+- `THIRD-PARTY-NOTICES.md`（第三方组件与许可证说明）
+
 ## [0.4.0] - 2026-08-10
 
 ### Feature Complete / Release Candidate
