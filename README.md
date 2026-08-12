@@ -162,4 +162,4 @@ MIT License. 第三方依赖：
 
 ---
 
-**PDF Studio AI V0.2** — Premium Desktop · AI Native · PDF Productivity
+**PDF Studio AI V0.4.0** — Premium Desktop · AI Native · PDF Productivity
