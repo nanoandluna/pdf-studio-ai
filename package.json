@@ -4,7 +4,6 @@
   "description": "PDF Studio AI - Local-First + AI-Native PDF Desktop Application (v0.4.0 RC)",
   "author": "PDF Studio AI",
   "license": "MIT",
-  "private": true,
   "main": "dist/main/index.cjs",
   "type": "module",
   "scripts": {

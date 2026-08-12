@@ -6,7 +6,7 @@
 >
 > 自 `git tag v0.4.0` 起 Feature Freeze：仅允许 Bug / Security / Compatibility / Performance 修复与严重 UX 修复，不再新增功能。
 
-个人自用的本地 PDF 工作台：查看、页面管理、合并拆分、OCR、AI Copilot。V0.4 完成 AI Workspace（Context Engine + Action Proposal + Document Intelligence），QA 全量通过（136/136 测试、真实 PDF 数据完整性验证）。
+本地优先的 PDF 工作台：查看、页面管理、合并拆分、OCR、AI Copilot。V0.4 完成 AI Workspace（Context Engine + Action Proposal + Document Intelligence），全量测试 175/175 通过。
 
 **产品模型：PDF 是画布，AI 是副驾驶，用户掌握最终控制权 —— 所有 AI 修改都可确认、可撤销，PDF 数据本身永远优先于 AI。**
 
@@ -59,7 +59,7 @@ Linear / Raycast / Arc / Notion 风格的克制专业风；现代暗色 + 暖白
 | PDF | pdf.js（渲染/文本）+ pdf-lib（编辑/合并/拆分） |
 | OCR | Tesseract.js WASM |
 | AI | OpenAI-compatible API + Function Calling + SSE Streaming |
-| Test | Vitest（136/136，V0.1 起逐步累积：V0.2 25 → V0.3/V0.3.1 → V0.4 全部通过） |
+| Test | Vitest（175/175，V0.1 起逐步累积：V0.2 25 → V0.3/V0.3.1 → V0.4 全部通过） |
 
 ## 项目结构
 
@@ -110,7 +110,7 @@ npm run dev
 ## 测试
 
 ```bash
-npm test                     # 136/136 全量单元测试
+npm test                     # 175/175 全量单元测试
 node scripts/smoke3.mjs      # V0.1 全功能冒烟（PDF 加载/缩略图/删除/Undo）
 node scripts/smoke-v02.mjs   # V0.2 冒烟（主题切换/Command Palette/AI Panel/折叠）
 ```

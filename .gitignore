@@ -35,3 +35,6 @@ scripts/.qa-tmp/
 # 构建/冒烟截图（正式主题预览在 docs/assets/）
 *.png
 !docs/assets/*.png
+
+# QA 帧目录
+hotfix-frames/
