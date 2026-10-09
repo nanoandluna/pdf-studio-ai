@@ -95,18 +95,10 @@ describe('PdfLibEditEngine — applyOperations', () => {
     expect(out.getPage(1).getRotation().angle).toBe(180);
   });
 
-  it('全部删除输出空文档（0 页）', async () => {
-    const ops: PdfEditOperations = {
-      pageOrder: [0, 1, 2, 3],
-      pageRotations: {},
-      deletedPages: [0, 1, 2, 3],
-    };
-    const out = await applyOperations(source, ops);
-    expect(out.getPageCount()).toBe(0);
+  it('全部删除会拒绝输出零页文档', async () => {
+    await expect(applyOperations(source, { pageOrder: [0, 1, 2, 3], pageRotations: {}, deletedPages: [0, 1, 2, 3] })).rejects.toThrow('至少需要保留一页');
   });
-});
 
-describe('PdfLibEditEngine — merge & split', () => {
   it('合并两个 PDF 页数相加', async () => {
     const a = await makePdf(['a1', 'a2']);
     const b = await makePdf(['b1']);

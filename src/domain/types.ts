@@ -45,49 +45,6 @@ export interface PageRange {
   end: number; // 1-based inclusive
 }
 
-/** 标注基类（Overlay 风格，不修改 Content Stream） */
-export type AnnotationKind = 'text' | 'highlight' | 'rectangle' | 'arrow' | 'pen';
-
-export interface Annotation {
-  id: string;
-  kind: AnnotationKind;
-  pageIndex: number; // 0-based
-  /** 标注坐标，相对于页面尺寸（0-1 归一化），便于跨缩放渲染 */
-  // 通用几何
-  color: string;
-  opacity: number;
-  createdAt: number;
-  // 按 kind 扩展的字段
-  points?: Point[]; // highlight / pen / arrow
-  rect?: Rect; // rectangle / highlight
-  text?: string; // text
-  fontSize?: number; // text
-  x?: number; // text
-  y?: number; // text
-}
-
-export interface Point {
-  x: number;
-  y: number;
-}
-
-export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/** 当前文档编辑状态（对已打开文档的变更描述） */
-export interface DocumentState {
-  document: PdfDocument | null;
-  /** 页面顺序（当前顺序，初始为 [0..n-1]） */
-  pageOrder: number[];
-  /** 已删除页（软删除，用于 undo） */
-  deletedPages: number[];
-  annotations: Annotation[];
-}
-
 // ============================================================
 // AI 相关领域类型
 // ============================================================
@@ -108,6 +65,8 @@ export interface AIMessage {
   pendingActions?: AIProposedAction[];
   /** V0.4：已执行的 AI 操作（可撤销） */
   executedActions?: AIProposedAction[];
+  /** Command IDs created by this proposal, excluding exports that do not edit the document. */
+  executedCommandIds?: string[];
   /** V0.4：是否来自 Document Intelligence 分析 */
   isInsight?: boolean;
   createdAt: number;

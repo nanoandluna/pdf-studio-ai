@@ -1,0 +1,36 @@
+name: Bug report / 问题反馈
+description: 报告可以复现的错误（安全漏洞请先阅读 SECURITY.md）
+title: "[Bug]: "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version / 版本
+      description: 发行版版本或源码 commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: Windows 版本；源码运行时请包含 Node.js 版本
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction / 复现步骤
+      description: 请使用无敏感信息的最小样例，说明点击或操作顺序
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual behavior / 期望与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Additional information / 补充信息
+      description: 可添加脱敏日志、截图和不含个人资料的 PDF 样例。不要提交 API Key 或机密文档。

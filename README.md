@@ -1,186 +1,93 @@
 # PDF Studio AI
 
-**Local-First + AI-Native 的现代 PDF 桌面应用（v0.4.0）**
+简体中文 · [English](README.en.md)
 
-> **🔒 V0.4 Feature Complete / Release Candidate — 已进入真实使用测试阶段**
->
-> 自 `git tag v0.4.0` 起 Feature Freeze：仅允许 Bug / Security / Compatibility / Performance 修复与严重 UX 修复，不再新增功能。
+本地优先的 PDF 桌面工作台，使用 Electron、React 和 TypeScript 构建。AI 是可选能力：无需账号或 API Key，也可以阅读和管理 PDF 页面。
 
-本地优先的 PDF 工作台：查看、页面管理、合并拆分、OCR、AI Copilot。V0.4 完成 AI Workspace（Context Engine + Action Proposal + Document Intelligence），全量测试 175/175 通过。
+[![CI](https://github.com/nanoandluna/pdf-studio-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/nanoandluna/pdf-studio-ai/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**平台定位：Windows-first**（Windows x64 为主要目标平台；开发环境与打包配置均以 Windows 为准）。
+![Obsidian 主题下的 PDF 工作台](docs/assets/theme-obsidian.png)
 
-**产品模型：PDF 是画布，AI 是副驾驶，用户掌握最终控制权 —— 所有 AI 修改都可确认、可撤销，PDF 数据本身永远优先于 AI。**
+## 已实现功能
 
-> **兼容性说明**：PDF 渲染（pdf.js）与 PDF 编辑/导出（pdf-lib）使用不同的引擎。少数格式异常或不常见的 PDF 可能**能正常渲染但编辑/保存失败**——这是引擎容错差异导致的正常现象，不是软件故障。
+- **阅读**：PDF 渲染、缩略图、翻页、缩放、全文搜索、阅读模式。
+- **页面管理**：删除、旋转、排序、提取、合并、拆分；保存后仍可撤销和重做。
+- **OCR**：Tesseract.js 中文/英文识别，识别结果加入当前会话搜索索引。
+- **可选 AI**：OpenAI / DeepSeek / Qwen / Ollama / 自定义 OpenAI-compatible 服务；自选模型与 API Key。
+- **文档辅助**：问答、页码引用、选中文字翻译/解释/总结、文档分析；AI 页面修改需用户确认。
+- **工作区**：四套主题、命令面板、可折叠侧栏和可调宽 AI 面板。
 
----
+## 项目状态与边界
 
-## 功能亮点
+当前源码版本为 **0.4.1**，仍属于早期桌面项目。主要验证及打包平台为 **Windows x64**；Linux CI 验证源码构建与单元测试，尚未提供 macOS/Linux 安装包。
 
-### 📖 PDF 查看与阅读
-
-- 渲染、翻页、跳页、缩放、适合宽度/适合页面、页面缩略图
-- **阅读模式**（Ctrl+Shift+R）：隐藏侧栏和工具栏，最大化 PDF
-- **四套主题**：Obsidian / Paper / Midnight / Aurora，即时切换并持久化
-
-### 🗂 页面管理
-
-- 多选、右键菜单、拖拽排序、可撤销删除/旋转
-- **合并 PDF**：多选 + 拖拽排序 + 输出
-- **拆分 PDF**：全部 / 范围（`1-5, 8, 10-12`）
-
-### ✏️ 基础编辑（Overlay）
-
-- 文本 / 高亮 / 矩形 / 箭头 / 画笔 / 擦除
-- 标注不破坏原 PDF，保存时重新生成
-
-### 🔍 搜索与 OCR
-
-- **全文搜索**（Ctrl+F）：文本层 + OCR 结果合并，跳页跳转
-- **OCR**：Tesseract.js WASM（中文），结果入搜索索引
-
-### 🤖 AI Copilot（本地优先）
-
-- **Provider 灵活**：OpenAI / DeepSeek / Qwen / Ollama（本地）/ Custom
-- **AI Workspace**：AI Panel 可折叠、可调宽（320–720px）、专注模式
-- **Action Proposal**：AI 提议破坏性操作（删除/旋转/排序/提取）→ 用户确认 → 可撤销
-- **Document Intelligence**（✦ 分析文档）：结构化 JSON 文档分析 + Insights 面板
-- **AI 引用**：回答附带页码，点击跳转
-- **Selected Text → AI**：框选文字 → 浮动工具栏（✦ Ask AI / 翻译 / 解释 / 总结）
-- **AI 总结**：Chunk + Map-Reduce + 页码引用
-- **AI 流式输出**：逐 token 显示
-- **AI 上下文选择器**：当前文档 / 当前页面 / 选中页面 / 选中文字
-
-### ⌨️ 效率工具
-
-- **Command Palette**（Ctrl+K）：Raycast 风格命令面板
-- **可折叠工作区**：sidebar / AI Panel 独立折叠
-- **拖拽打开 PDF**：Viewer 区拖入 PDF 高亮提示
-
-### 🔐 安全与隐私
-
-- **本地优先**：PDF 默认不上传；API Key 系统安全存储（safeStorage 加密）
-- **浮层可读性**：统一 Surface 层级系统（L0–L5），浮层与背景清晰分层
-- **AI 可控**：所有 AI 修改可确认、可撤销，PDF 数据永远优先
-
-## 技术栈
-
-| 层 | 技术 |
-|---|---|
-| Desktop | Electron 33 |
-| Frontend | React 18 + TypeScript + Vite 6 |
-| UI | Design Tokens（CSS Variables）+ Tailwind CSS 3 + 自写组件库 |
-| State | Zustand（7 个 store：document/viewer/editor/ai/settings/workspace/recent） |
-| PDF | pdf.js（渲染/文本）+ pdf-lib（编辑/合并/拆分） |
-| OCR | Tesseract.js WASM |
-| AI | OpenAI-compatible API + Function Calling + SSE Streaming |
-| Test | Vitest（175/175，V0.1 起逐步累积：V0.2 25 → V0.3/V0.3.1 → V0.4 全部通过） |
-
-## 项目结构
-
-```text
-pdf-studio-ai/
-├── electron/             # 主进程 + preload
-├── src/
-│   ├── components/
-│   │   ├── ui/          # Design System 组件库（Button/Input/Dropdown 等）
-│   │   ├── commandPalette.tsx  # Ctrl+K
-│   │   ├── aiPanel.tsx  # ✦ PDF Copilot
-│   │   ├── sidebar.tsx  # 左侧导航（Icon/展开/折叠）
-│   │   ├── toolbar.tsx  # 顶部 Command Bar
-│   │   └── ...
-│   ├── stores/           # Zustand: document/viewer/editor/ai/settings/workspace/recent
-│   ├── theme/            # Design Tokens + 4 套主题定义
-│   ├── ai/
-│   │   ├── providers/   # AIProvider Registry（OpenAI/DeepSeek/Qwen/Ollama/Custom）
-│   │   ├── context.ts   # Context Engine（统一收集 PDF 上下文）
-│   │   ├── tools.ts     # PDF Tool Calling
-│   │   └── chunk.ts     # Chunk + Map-Reduce
-│   ├── engine/           # PDF Engine 抽象（pdf.js / pdf-lib）
-│   ├── commands/         # Command 模式 + Undo/Redo
-│   ├── ocr/, search/     # Tesseract.js + 搜索索引
-│   ├── domain/           # 领域类型（PDF/AI）
-│   └── lib/              # Logger / Errors
-├── scripts/              # 构建 / 启动 / 冒烟
-├── tests/                # 单元 + 集成 + fixtures
-└── docs/                 # TASKS.md / DESIGN-SYSTEM.md
-```
+- **标注原型已移除**：旧版文本/高亮/画笔等 Overlay 没有写入导出的 PDF。完成保存、撤销、重开验证后再重新引入，见 [路线图](docs/ROADMAP.md)。
+- 当前提供**页面级编辑**，不支持直接修改 PDF 原有文字。密码保护 PDF、表单、书签、数字签名等复杂结构的编辑保真尚未保证，处理重要文件时请保留原件。
+- 单个打开文件上限 **100 MB**。拖拽文件通过浏览器授予的字节读取，首次保存会要求**另存为**。
+- OCR 首次使用需要下载识别引擎及语言模型；目前不保证完全离线运行，也不会把 OCR 结果保存为 PDF 文本层。
+- AI 回答可能有误，引用页码是导航辅助。长文档上下文有长度限制。
 
 ## 下载与安装
 
-**推荐直接下载预构建版本**（无需安装 Node.js）：
+到 [GitHub Releases](https://github.com/nanoandluna/pdf-studio-ai/releases) 查看已发布版本。**发行版可能落后于源码**，请核对版本和校验值。Windows 安装包尚未进行代码签名。
 
-[📥 下载 Windows 便携版 v0.4.0](https://github.com/nanoandluna/pdf-studio-ai/releases/tag/v0.4.0)
+## 从源码运行
 
-- `PDF.Studio.AI-0.4.0-portable.exe`（约 83 MB，绿色便携版，双击即用）
-- Windows 可能提示 SmartScreen（未签名），选择「更多信息 → 仍要运行」
+推荐 **Node.js 24 LTS**（最低 22.12）和 npm：
 
-> **单文件大小上限：100 MB** —— 超出会提示"文件过大"，这是有意的保护措施。
-
-## 从源码构建
-
-```bash
-npm install        # 安装依赖
-npm run dev        # 开发模式（Vite + Electron）
-npm test           # 全量单元测试
-npm run build      # 生产构建
-npm run pack       # 打包 portable exe（输出到 release/）
+```sh
+git clone https://github.com/nanoandluna/pdf-studio-ai.git
+cd pdf-studio-ai
+npm ci
+npm run dev
 ```
 
-## 测试
-
-```bash
-npm test                     # 175/175 全量单元测试
-node scripts/smoke3.mjs      # V0.1 全功能冒烟（PDF 加载/缩略图/删除/Undo）
-node scripts/smoke-v02.mjs   # V0.2 冒烟（主题切换/Command Palette/AI Panel/折叠）
+```sh
+npm run check       # 启动脚本语法、类型检查、单元测试、生产构建
+npm run test:smoke  # 真实 Electron 渲染、连续保存、撤销、IPC 检查（Windows）
+npm run pack        # Windows x64 便携版
+npm run dist        # Windows x64 NSIS 安装包
 ```
 
-V0.2 冒烟会生成 `theme-obsidian.png` / `theme-paper.png` / `theme-midnight.png` / `theme-aurora.png` 四套主题截图（正式预览见 `docs/assets/`）。
+构建输出在 `dist/`，安装包在 `release/<版本>/`。冒烟测试使用独立临时配置目录，结束后恢复生产构建，并输出截图和测试 PDF 所在路径。请在打包前运行。开发约定见 [贡献指南](CONTRIBUTING.md)。
 
-## 主题切换
+## AI 配置与隐私
 
-- 命令面板：`Ctrl+K` → "切换主题：Obsidian / Paper / Midnight / Aurora"
-- 设置 → 外观 → ThemeCard 实时预览，即时切换无需重启
+打开 **设置 → AI**，选择服务，填写 Base URL、Model 和 API Key，再保存或测试。Ollama 可以填写自己的本机地址和已安装模型，无需 API Key。远程地址要求 HTTPS，本机 localhost / 127.0.0.1 / ::1 可以使用 HTTP。
+
+各服务的配置和密钥分别保存，使用 Electron `safeStorage` 加密。旧版共享密钥只迁移给原来选中的服务。系统加密不可用时保存会失败，不会显示保存成功。
+
+PDF 默认留在本机。使用 AI 时，相关文档文本、提问和聊天上下文会发送到你配置的服务；启用数据外发提示时，每次远程请求前会确认。提示开关不会改变服务商的数据保留政策。本项目未实现使用统计或遥测。
+
+OCR 会访问第三方资源 CDN 下载识别资源，但识别过程在本地执行。安全边界和漏洞报告方式见 [SECURITY.md](SECURITY.md)。
 
 ## 快捷键
 
 | 快捷键 | 功能 |
 |---|---|
-| `Ctrl+O` | 打开 PDF |
-| `Ctrl+S` / `Ctrl+Shift+S` | 保存 / 另存为 |
-| `Ctrl+Z` / `Ctrl+Shift+Z` | 撤销 / 重做 |
-| `Ctrl+F` | 全文搜索 |
-| **`Ctrl+K`** | **命令面板** |
-| `Ctrl++` / `Ctrl+-` / `Ctrl+0` | 放大 / 缩小 / 适合页面 |
-| `Ctrl+E` | 切换 AI Panel |
-| **`Ctrl+Shift+R`** | **阅读模式** |
-| `Ctrl+Enter` | 发送 AI 消息 |
-| `PageUp` / `PageDown` | 上一页 / 下一页 |
-| `Delete` | 删除选中页 |
+| Ctrl+O | 打开 PDF |
+| Ctrl+S / Ctrl+Shift+S | 保存 / 另存为 |
+| Ctrl+Z / Ctrl+Shift+Z | 撤销 / 重做 |
+| Ctrl+F | 搜索 |
+| Ctrl+K | 命令面板 |
+| Ctrl++ / Ctrl+- / Ctrl+0 | 放大 / 缩小 / 适合页面 |
+| Ctrl+E | AI 面板 |
+| Ctrl+Shift+R | 阅读模式 |
+| PageUp / PageDown | 翻页 |
+| Delete | 删除选中页（输入框内不触发） |
 
 ## 常见问题
 
-**Q：`npm install` 卡住无输出？**
-A：通常是网络问题，重试或换用 npm 镜像（如 `npm config set registry https://registry.npmmirror.com`）。
+- **安装缓慢**：`npm ci` 和首次启动可能下载 Electron，检查网络与代理配置；不要把个人镜像或代理配置提交到仓库。
+- **AI 无法连接**：先选择服务、填写模型与密钥，再点击当前服务的测试；确认 endpoint 支持 Chat Completions。
+- **PDF 能读但无法编辑**：pdf.js 与 pdf-lib 的兼容范围不同。保存失败会保留当前编辑状态；请使用简化样例报告问题。
+- **OCR 无法运行**：首次使用需要联网下载资源；缓存或 CDN 访问失败时可稍后重试。
 
-**Q：Electron 启动后立即退出？**
-A：通过 `npm run dev` 启动（脚本已处理 `ELECTRON_RUN_AS_NODE` / `NODE_OPTIONS`）。
+## 参与贡献
 
-**Q：主题切换后没生效？**
-A：`Ctrl+K` → "切换主题：..." 立即应用。或设置 → 外观选择。
+欢迎 [报告问题或提出建议](https://github.com/nanoandluna/pdf-studio-ai/issues/new/choose)。优先接受可靠性、安全、兼容性和体验改进；较大功能请先讨论。请勿提交 API Key、个人配置或机密 PDF。
 
-**Q：AI 无法连接？**
-A：设置 → AI → 选择 Provider 卡片 → 填写 Base URL + API Key + Model → "测试"。
+[贡献指南](CONTRIBUTING.md) · [路线图](docs/ROADMAP.md) · [变更记录](CHANGELOG.md)
 
-## 许可证
-
-MIT License. 第三方依赖：
-- pdf.js（Apache-2.0）
-- pdf-lib（MIT）
-- Tesseract.js（Apache-2.0）
-- Electron（MIT）
-
----
-
-**PDF Studio AI V0.4.0** — Premium Desktop · AI Native · PDF Productivity
+MIT License。第三方组件见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

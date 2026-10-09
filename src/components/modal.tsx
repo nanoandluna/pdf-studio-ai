@@ -4,7 +4,7 @@
 // ============================================================
 
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { IconClose } from './icons';
 
 interface DialogProps {
@@ -25,6 +25,7 @@ export function Dialog({
   width = 'w-[520px]',
   closable = true,
 }: DialogProps): JSX.Element | null {
+  const titleId = useId();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -43,11 +44,14 @@ export function Dialog({
         onClick={onClose}
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={`relative ${width} max-h-[85vh] overflow-hidden rounded-xl bg-app-dialog shadow-elev3 ring-1 ring-app-popover-border/60 animate-[dialog-in_.15s_ease]`}
         style={{ animation: 'dialog-in 0.15s ease' }}
       >
         <div className="flex items-center justify-between px-5 py-4">
-          <h2 className="text-title">{title}</h2>
+          <h2 id={titleId} className="text-title">{title}</h2>
           {closable && (
             <button
               onClick={onClose}

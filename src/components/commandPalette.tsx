@@ -1,3 +1,4 @@
+import { runDocumentAction } from '@lib/documentAction';
 // ============================================================
 // CommandPalette — Ctrl+K 命令面板（V0.3.1）
 // 分类（AI/PDF/View/Navigation/Tools）+ fuzzy search
@@ -85,7 +86,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'ai-analyze', label: '✦ 分析文档', hint: 'Document Intelligence：类型/主题/作者/总结', keywords: ['分析', 'analyze', 'insights', '文档'], icon: <IconSpark width={15} height={15} />, disabled: !doc, category: 'AI', run: () => { setPanelOpen(true); useAiStore.getState().analyzeDocument(); } },
 
       // ---- PDF ----
-      { id: 'pdf-delete', label: '◇ 删除当前页面', hint: '删除当前页（可撤销）', keywords: ['删除', 'delete', '页面'], icon: <IconTrash width={15} height={15} />, disabled: !doc, category: 'PDF', run: () => { useDocumentStore.getState().deletePages([currentPage]); } },
+      { id: 'pdf-delete', label: '◇ 删除当前页面', hint: '删除当前页（可撤销）', keywords: ['删除', 'delete', '页面'], icon: <IconTrash width={15} height={15} />, disabled: !doc, category: 'PDF', run: () => { void runDocumentAction(() => useDocumentStore.getState().deletePages([currentPage])); } },
       { id: 'pdf-rotate', label: '◇ 旋转当前页面', hint: '顺时针旋转 90°', keywords: ['旋转', 'rotate'], icon: <IconRotate width={15} height={15} />, disabled: !doc, category: 'PDF', run: () => { useDocumentStore.getState().rotatePages([currentPage], 90); } },
       { id: 'pdf-extract', label: '◇ 提取页面', hint: '把当前页保存为新 PDF', keywords: ['提取', 'extract'], icon: <IconBookOpen width={15} height={15} />, disabled: !doc, category: 'PDF', run: () => { useDocumentStore.getState().extractPages([currentPage]); } },
       { id: 'merge', label: '合并 PDF', hint: '把多个 PDF 合并为一个', keywords: ['merge', '合并'], icon: <IconMerge width={15} height={15} />, category: 'PDF', run: () => dispatch('menu:merge') },

@@ -23,8 +23,6 @@ interface ViewerState {
   selectedPages: Set<number>;
   /** 是否允许多选（Ctrl/Shift） */
   multiSelect: boolean;
-  /** 编辑工具模式（null = 查看） */
-  tool: 'select' | 'text' | 'highlight' | 'rectangle' | 'arrow' | 'pen' | 'eraser' | null;
   /** 框选文本（Selected Text → AI） */
   selection: { pageIndex: number; text: string; x: number; y: number; width: number; height: number } | null;
 
@@ -46,7 +44,6 @@ interface ViewerState {
   setSearchQuery: (q: string) => void;
   selectPage: (index: number, additive: boolean) => void;
   clearSelection: () => void;
-  setTool: (tool: ViewerState['tool']) => void;
   setTextSelection: (sel: ViewerState['selection']) => void;
   clearTextSelection: () => void;
 }
@@ -63,7 +60,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   searchQuery: '',
   selectedPages: new Set(),
   multiSelect: false,
-  tool: null,
   selection: null,
 
   setCurrentPage: (page) => set({ currentPage: page }),
@@ -122,7 +118,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
 
   clearSelection: () => set({ selectedPages: new Set() }),
 
-  setTool: (tool) => set({ tool }),
 
   setTextSelection: (sel) => set({ selection: sel }),
   clearTextSelection: () => set({ selection: null }),

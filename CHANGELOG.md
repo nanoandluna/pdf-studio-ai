@@ -2,6 +2,35 @@
 
 所有重要变更都记录在此文件中。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.4.1] - 2026-10-09
+
+### Fixed
+
+- 保存保留原始 PDF 字节/索引；连续保存不再重复删除、排序或旋转，保存后可撤销；保存中的新编辑保持未保存状态。
+- pdf.js 使用独立 ArrayBuffer，避免 worker 转移输入后保存引擎拿到空数据。
+- 保存通过临时文件替换；保存失败可重试；打开损坏 PDF 保留之前文档；退出/切换文档提示未保存更改。
+- 拖拽文件使用 File 字节并首次另存，遵守 100 MB 限制；提取页面保留当前旋转。
+- 各 AI Provider 的配置/密钥分别保存，旧密钥仅迁移给所属服务；本机 AI 无需密钥，Ollama 支持自选模型；配置测试使用实际编辑值，保存失败不再误报成功。
+- 远程 AI 数据外发提示生效；切换文档清理旧会话和提议；分析结果不再回写到其他文档。
+- 开发入口改为有效 JavaScript 并清理 Vite 子进程；输入框内不再触发删页快捷键；关于页版本来自 package.json。
+
+### Security
+
+- 更新 Electron、构建和测试组件；renderer 启用 sandbox；IPC 验证窗口/frame，禁止导航/webview；生产版隐藏测试 store。
+- PDF 输出限制为 `.pdf`；AI 远程接口限制为 HTTPS，本机允许 HTTP。
+
+### Removed
+
+- 无法导出到 PDF 的标注 Overlay 原型及其状态代码。
+- 未实现的语言切换、渲染质量选项，重复的旧 AI Provider/Orchestrator。
+- 环境专用依赖安装/全局杀进程脚本与仅打印结果的历史冒烟脚本。
+
+### Added
+
+- 文档生命周期、密钥隔离、配置失败、原子写入回归测试及统一的真实 Electron 冒烟检查。
+- 双语 README、路线图、问题/PR 模板、Dependabot、Windows/Linux CI 与草稿发布流程。
+- 明确说明 OCR 离线、PDF 保真、AI 上下文和平台支持的当前限制。
+
 ## [0.4.0-hotfix] - 2026-08-12
 
 Feature Freeze 后的 Bug / Security / 严重 UX 修复（随 main 分支发布）。

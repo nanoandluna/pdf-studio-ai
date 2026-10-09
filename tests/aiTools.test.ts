@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolRegistry, type PdfActionBus } from '@ai/tools';
 import { chunkText } from '@ai/chunk';
-import { extractCitations } from '@ai/orchestrator';
+import { extractCitations } from '@ai/citations';
 
 describe('ToolRegistry', () => {
   let registry: ToolRegistry;

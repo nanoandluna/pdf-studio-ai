@@ -23,10 +23,11 @@ delete env['ELECTRON_RUN_AS_NODE'];
 delete env['NODE_OPTIONS'];
 
 console.log('🚀 启动 PDF Studio AI（生产模式）');
-const child = spawn(electronExe, ['.', '--no-sandbox', '--disable-gpu'], {
+const child = spawn(electronExe, ['.'], {
   cwd: root,
   env,
   stdio: 'inherit',
+  windowsHide: true,
 });
 child.on('exit', (code) => process.exit(code ?? 0));
 child.on('error', (e) => {

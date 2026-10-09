@@ -22,6 +22,9 @@ const bridge = {
   saveFileDialog: (opts?: unknown) => ipcRenderer.invoke('dialog:saveFile', opts),
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
 
+  confirmDiscard: () => ipcRenderer.invoke('document:confirmDiscard'),
+  confirmAiSend: (baseUrl: string) => ipcRenderer.invoke('ai:confirmSend', baseUrl),
+
   // 文件读写
   readFile: (path: string) => ipcRenderer.invoke('fs:readFile', path),
   writeFile: (path: string, data: Uint8Array) => ipcRenderer.invoke('fs:writeFile', path, data),

@@ -31,6 +31,16 @@ export class CommandHistory {
     return this.redoStack.length;
   }
 
+  get lastCommandId(): string | undefined {
+    return this.undoStack.at(-1)?.id;
+  }
+
+  /** A group may only undo the exact commands at the top, never later manual edits. */
+  canUndoCommands(ids: string[]): boolean {
+    if (!ids.length || ids.length > this.undoStack.length) return false;
+    return this.undoStack.slice(-ids.length).every((command, index) => command.id === ids[index]);
+  }
+
   /** 清空（打开新文档时调用） */
   clear(): void {
     this.undoStack = [];

@@ -35,6 +35,8 @@ export interface IpcBridge {
   openFilesDialog(opts?: FileDialogOptions): Promise<{ files: { path: string; name: string; data: ArrayBuffer }[]; cancelled: boolean }>;
   saveFileDialog(opts?: FileDialogOptions): Promise<SaveFileResult>;
   selectDirectory(opts?: FileDialogOptions): Promise<{ path: string | null }>;
+  confirmDiscard(): Promise<boolean>;
+  confirmAiSend(baseUrl: string): Promise<boolean>;
   readFile(path: string): Promise<ArrayBuffer>;
   writeFile(path: string, data: Uint8Array): Promise<void>;
   fileExists(path: string): Promise<boolean>;

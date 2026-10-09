@@ -1,27 +1,24 @@
 // ============================================================
-// Viewer — PDF 页面渲染 + 标注 overlay + 搜索高亮
+// Viewer — PDF 页面渲染 + 框选文本 + 搜索
 // 每个可见页一个 canvas + svg overlay
 // ============================================================
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useDocumentStore, viewEngine } from '@stores/documentStore';
 import { useViewerStore } from '@stores/viewerStore';
-import { useEditorStore } from '@stores/editorStore';
 import { useAiStore } from '@stores/aiStore';
 import { useWorkspaceStore } from '@stores/workspaceStore';
-import type { Annotation } from '@domain/types';
 import { SearchBar } from './searchBar';
 import { IconSpark } from './icons';
 import { calculateLayoutSize, calculateRenderRange, buildRenderKey } from './viewerMath';
 
 export function Viewer(): JSX.Element {
-  const { document, pageOrder, deletedPages, pageRotations, pageSizes, annotations, addAnnotation, updateAnnotation, removeAnnotation } = useDocumentStore();
-  const { scale, zoomMode, currentPage, navTarget, setCurrentPage, clearNavTarget, tool, setTool } = useViewerStore();
-  const editor = useEditorStore();
+  const { document, pageOrder, deletedPages, pageRotations, pageSizes } = useDocumentStore();
+  const { scale, zoomMode, currentPage, navTarget, setCurrentPage, clearNavTarget } = useViewerStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [dragActive, setDragActive] = useState(false);
-  const openFile = useDocumentStore((s) => s.openFile);
+  const openDroppedFile = useDocumentStore((s) => s.openDroppedFile);
   // 关键修复：基于稳定字段（pageOrder / deletedPages）派生可见页，避免 store 每次 set 都
   // 触发 selector 返回新数组造成的 useEffect 链式循环（React #185）
   const visiblePageIndexes = useMemo(
@@ -208,16 +205,7 @@ export function Viewer(): JSX.Element {
         setDragActive(false);
         const file = e.dataTransfer.files[0];
         if (file && file.name.toLowerCase().endsWith('.pdf')) {
-          const path = (file as File & { path?: string }).path;
-          if (path) {
-            openFile(path);
-          } else {
-            file.arrayBuffer().then((buf) => {
-              useDocumentStore.getState().openBytes(buf, file.name, file.name);
-            }).catch(() => {
-              useDocumentStore.getState().setError('无法读取该文件，请确认文件未损坏。');
-            });
-          }
+          void openDroppedFile(file);
         }
       }}
     >
@@ -253,7 +241,6 @@ export function Viewer(): JSX.Element {
                 effectiveScale={effectiveScale}
                 isCurrent={pageIdx === currentPage}
                 rotation={pageRotations[pageIdx] ?? 0}
-                annotations={annotations.filter((a) => a.pageIndex === pageIdx)}
                 onCanvasRef={(c) => (canvasRefs.current[pageIdx] = c)}
                 onPageClick={() => setCurrentPage(pageIdx)}
               />
@@ -261,13 +248,6 @@ export function Viewer(): JSX.Element {
           })}
         </div>
       </div>
-      {/* 编辑工具栏（覆盖在右下角） */}
-      {document && (
-        <EditToolbarOverlay
-          tool={tool}
-          setTool={setTool}
-        />
-      )}
       {/* Selected Text → AI 浮动工具栏 */}
       <SelectionToolbar />
     </div>
@@ -283,7 +263,6 @@ function PageCanvas({
   effectiveScale,
   isCurrent,
   rotation,
-  annotations,
   onCanvasRef,
   onPageClick,
 }: {
@@ -295,20 +274,10 @@ function PageCanvas({
   effectiveScale: number;
   isCurrent: boolean;
   rotation: number;
-  annotations: Annotation[];
   onCanvasRef: (c: HTMLCanvasElement | null) => void;
   onPageClick: () => void;
 }): JSX.Element {
-  const editor = useEditorStore();
-  const { addAnnotation, updateAnnotation } = useDocumentStore();
-  const { setTool, tool } = useViewerStore();
   const svgRef = useRef<SVGSVGElement>(null);
-
-  // 页面逻辑尺寸（svg overlay 坐标系）：与布局尺寸一致（未渲染时也正确）
-  const w = layoutW;
-  const h = layoutH;
-
-  const normToSvg = (p: { x: number; y: number }) => ({ x: p.x * w, y: p.y * h });
 
   // ---- 框选文本（Selected Text → AI） ----
   const [dragSel, setDragSel] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -317,42 +286,16 @@ function PageCanvas({
   const docId = useDocumentStore((s) => s.document?.id);
 
   const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!tool || tool === 'select') {
-      // 选择/查看模式：记录拖拽起点用于框选文字
-      const svg = svgRef.current!;
-      const rect = svg.getBoundingClientRect();
-      dragStartRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      setDragSel(null);
-      onPageClick();
-      return;
-    }
-    if (tool === 'eraser') {
-      const pt = pointFromEvent(e);
-      // 删除最近的标注
-      const hit = annotations.find((a) => {
-        const x = pt.x * w, y = pt.y * h;
-        if (a.rect) {
-          return x >= a.rect.x && x <= a.rect.x + a.rect.width && y >= a.rect.y && y <= a.rect.y + a.rect.height;
-        }
-        if (a.points) {
-          return a.points.some((p) => Math.abs(p.x * w - x) < 6 && Math.abs(p.y * h - y) < 6);
-        }
-        return false;
-      });
-      if (hit) updateAnnotation(hit.id, { opacity: 0 });
-      return;
-    }
-    e.preventDefault();
     const svg = svgRef.current!;
     const rect = svg.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    editor.beginStroke(tool, x, y);
+    dragStartRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setDragSel(null);
+    onPageClick();
     svg.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if ((!tool || tool === 'select') && dragStartRef.current) {
+    if (dragStartRef.current) {
       const svg = svgRef.current!;
       const rect = svg.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -360,17 +303,11 @@ function PageCanvas({
       setDragSel({ x0: dragStartRef.current.x, y0: dragStartRef.current.y, x1: x, y1: y });
       return;
     }
-    if (!editor.pending.kind) return;
-    const svg = svgRef.current!;
-    const rect = svg.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    editor.extendStroke(x, y);
   };
 
   const handlePointerUp = async () => {
     // 框选文字完成 → 提取选区文本
-    if ((!tool || tool === 'select') && dragStartRef.current) {
+    if (dragStartRef.current) {
       const sel = dragSel;
       dragStartRef.current = null;
       setDragSel(null);
@@ -396,38 +333,6 @@ function PageCanvas({
       }
       return;
     }
-    const stroke = editor.finishStroke();
-    if (!stroke || !stroke.kind) return;
-    const id = crypto.randomUUID();
-    const common = {
-      id,
-      pageIndex: pageIdx,
-      color: editor.strokeColor,
-      opacity: editor.opacity,
-      createdAt: Date.now(),
-    };
-    if (stroke.kind === 'text') {
-      // 文本需要弹出输入框 —— 用 prompt 简版（V0.1）
-      const text = window.prompt('输入文本：', '');
-      if (text) {
-        addAnnotation({ ...common, kind: 'text', text, x: stroke.start?.x ?? 0.5, y: stroke.start?.y ?? 0.1, fontSize: editor.fontSize });
-      }
-    } else if (stroke.kind === 'highlight') {
-      const start = stroke.start!;
-      const last = stroke.points[stroke.points.length - 1];
-      const rect = normalizeRect(start, last);
-      addAnnotation({ ...common, kind: 'highlight', rect });
-    } else if (stroke.kind === 'rectangle') {
-      const start = stroke.start!;
-      const last = stroke.points[stroke.points.length - 1];
-      const rect = normalizeRect(start, last);
-      addAnnotation({ ...common, kind: 'rectangle', rect });
-    } else if (stroke.kind === 'arrow') {
-      addAnnotation({ ...common, kind: 'arrow', points: stroke.points });
-    } else if (stroke.kind === 'pen') {
-      addAnnotation({ ...common, kind: 'pen', points: stroke.points });
-    }
-    setTool('select');
   };
 
   return (
@@ -444,15 +349,8 @@ function PageCanvas({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        style={{ cursor: cursorForTool(tool) }}
+        style={{ cursor: 'text' }}
       >
-        {annotations.map((a) => (
-          <AnnotationShape key={a.id} ann={a} w={w} h={h} />
-        ))}
-        {/* 进行中的绘制 */}
-        {editor.pending.kind && (
-          <PendingShape pending={editor.pending} w={w} h={h} color={editor.strokeColor} opacity={editor.opacity} width={editor.strokeWidth} />
-        )}
         {/* 框选文字区域（Selected Text → AI） */}
         {dragSel && (
           <rect
@@ -473,168 +371,6 @@ function PageCanvas({
 }
 
 // ================== 标注形状 ==================
-
-function AnnotationShape({ ann, w, h }: { ann: Annotation; w: number; h: number }): JSX.Element {
-  const common = { fill: ann.color, stroke: ann.color, opacity: ann.opacity };
-  switch (ann.kind) {
-    case 'highlight':
-      return <rect x={ann.rect!.x} y={ann.rect!.y} width={ann.rect!.width} height={ann.rect!.height} {...common} opacity={0.35} rx={2} />;
-    case 'rectangle':
-      return <rect x={ann.rect!.x} y={ann.rect!.y} width={ann.rect!.width} height={ann.rect!.height} fill="none" stroke={ann.color} strokeWidth={1.5} opacity={ann.opacity} />;
-    case 'arrow': {
-      const pts = ann.points ?? [];
-      if (pts.length < 2) return <g />;
-      const start = pts[0], end = pts[pts.length - 1];
-      const s = { x: start.x * w, y: start.y * h };
-      const en = { x: end.x * w, y: end.y * h };
-      return <g stroke={ann.color} strokeWidth={1.5} fill={ann.color} opacity={ann.opacity}>
-        <line x1={s.x} y1={s.y} x2={en.x} y2={en.y} />
-        <ArrowHead from={s} to={en} size={8} />
-      </g>;
-    }
-    case 'pen': {
-      const pts = ann.points ?? [];
-      if (pts.length < 2) return <g />;
-      const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * w} ${p.y * h}`).join(' ');
-      return <path d={d} fill="none" stroke={ann.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={ann.opacity} />;
-    }
-    case 'text':
-      return (
-        <text x={ann.x! * w} y={ann.y! * h} fontSize={ann.fontSize ?? 14} fill={ann.color} opacity={ann.opacity} style={{ userSelect: 'none' }}>
-          {ann.text}
-        </text>
-      );
-    default:
-      return <g />;
-  }
-}
-
-function PendingShape({ pending, w, h, color, opacity, width }: {
-  pending: { kind: string | null; points: { x: number; y: number }[]; start: { x: number; y: number } | null };
-  w: number; h: number; color: string; opacity: number; width: number;
-}): JSX.Element {
-  if (!pending.start || pending.points.length === 0 || !pending.kind) return <g />;
-  const start = { x: pending.start.x * w, y: pending.start.y * h };
-  const last = { x: pending.points[pending.points.length - 1].x * w, y: pending.points[pending.points.length - 1].y * h };
-  if (pending.kind === 'pen') {
-    const d = pending.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * w} ${p.y * h}`).join(' ');
-    return <path d={d} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" opacity={opacity} />;
-  }
-  if (pending.kind === 'rectangle' || pending.kind === 'highlight') {
-    const rect = normalizeRect(pending.start, pending.points[pending.points.length - 1]);
-    return <rect x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill="none" stroke={color} strokeWidth={1.5} opacity={pending.kind === 'highlight' ? 0.4 : opacity} />;
-  }
-  if (pending.kind === 'arrow') {
-    return <g stroke={color} strokeWidth={1.5} fill={color} opacity={opacity}>
-      <line x1={start.x} y1={start.y} x2={last.x} y2={last.y} />
-      <ArrowHead from={start} to={last} size={8} />
-    </g>;
-  }
-  return <g />;
-}
-
-function ArrowHead({ from, to, size }: { from: { x: number; y: number }; to: { x: number; y: number }; size: number }): JSX.Element {
-  const angle = Math.atan2(to.y - from.y, to.x - from.x);
-  const p1 = { x: to.x - size * Math.cos(angle - Math.PI / 6), y: to.y - size * Math.sin(angle - Math.PI / 6) };
-  const p2 = { x: to.x - size * Math.cos(angle + Math.PI / 6), y: to.y - size * Math.sin(angle + Math.PI / 6) };
-  return (
-    <polygon points={`${to.x},${to.y} ${p1.x},${p1.y} ${p2.x},${p2.y}`} />
-  );
-}
-
-function normalizeRect(a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number; width: number; height: number } {
-  return {
-    x: Math.min(a.x, b.x),
-    y: Math.min(a.y, b.y),
-    width: Math.abs(b.x - a.x),
-    height: Math.abs(b.y - a.y),
-  };
-}
-
-function cursorForTool(tool: string | null): string {
-  switch (tool) {
-    case 'text': return 'text';
-    case 'highlight': return 'cell';
-    case 'rectangle': return 'crosshair';
-    case 'arrow': return 'crosshair';
-    case 'pen': return 'crosshair';
-    case 'eraser': return 'not-allowed';
-    default: return 'default';
-  }
-}
-
-function pointFromEvent(e: React.PointerEvent): { x: number; y: number } {
-  const target = e.currentTarget as SVGElement;
-  const rect = target.getBoundingClientRect();
-  return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
-}
-
-// ================== 编辑工具栏 Overlay（V0.3 浮动式） ==================
-// 默认隐藏；选择标注工具时显示（工具完成后自动回到 select 并隐藏）
-
-function EditToolbarOverlay({ tool, setTool }: { tool: string | null; setTool: (t: ViewerState['tool']) => void }) {
-  const { strokeColor, setColor } = useEditorStore();
-  const { clearAnnotations, annotations } = useDocumentStore();
-
-  const tools = [
-    { id: 'text', label: '文本', icon: <span className="text-[12px] font-semibold">T</span> },
-    { id: 'highlight', label: '高亮', icon: <span className="text-[13px]">🖍</span> },
-    { id: 'rectangle', label: '矩形', icon: <span className="text-[13px]">▭</span> },
-    { id: 'arrow', label: '箭头', icon: <span className="text-[13px]">↗</span> },
-    { id: 'pen', label: '画笔', icon: <span className="text-[13px]">✏️</span> },
-    { id: 'eraser', label: '擦除', icon: <span className="text-[13px]">🧽</span> },
-  ];
-
-  // 非 select 工具或已有标注时才显示（工具是隐形的）
-  const visible = tool !== 'select' || annotations.length > 0;
-  if (!visible) return null;
-
-  return (
-    <div
-      className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-elev2 ring-1 ring-app-popover-border/40"
-      style={{ background: 'hsl(var(--surface-popover))' }}
-    >
-      {tools.map((t) => (
-        <button
-          key={t.id}
-          title={t.label}
-          onClick={() => setTool(t.id as ViewerState['tool'])}
-          className={`flex h-7 w-8 items-center justify-center rounded-md text-[13px] transition-colors ${
-            tool === t.id ? 'bg-accent-soft text-accent' : 'text-fg-muted hover:bg-app-panel-hover hover:text-fg'
-          }`}
-        >
-          {t.icon}
-        </button>
-      ))}
-      <div className="divider-y mx-1" />
-      <div className="flex items-center gap-1 px-1">
-        {['#e5484d', '#ffb224', '#46a758', '#3e63dd', '#8e4ec6', '#111111'].map((c) => (
-          <button
-            key={c}
-            title={c}
-            onClick={() => setColor(c)}
-            className={`h-3.5 w-3.5 rounded-full transition-transform hover:scale-110 ${
-              strokeColor === c ? 'ring-2 ring-accent/60 ring-offset-1' : ''
-            }`}
-            style={{ background: c }}
-          />
-        ))}
-      </div>
-      {annotations.length > 0 && (
-        <>
-          <div className="divider-y mx-1" />
-          <button
-            title="清除全部标注"
-            onClick={() => clearAnnotations()}
-            className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-fg-muted transition-colors hover:bg-app-panel-hover hover:text-danger"
-          >
-            🗑 清除
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ================== Selected Text → AI 浮动工具栏（V0.3.1） ==================
 function SelectionToolbar(): JSX.Element | null {

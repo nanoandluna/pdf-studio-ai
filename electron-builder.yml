@@ -10,6 +10,10 @@ files:
   - dist/**
   - package.json
 
+extraResources:
+  - from: dist/licenses
+    to: licenses
+
 # 主进程入口由 package.json 的 "main" 字段提供（esbuild 打包为 CJS）
 
 win:

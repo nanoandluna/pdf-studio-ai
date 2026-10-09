@@ -1,26 +1,24 @@
-# 安全策略（SECURITY）
+# 安全策略
 
 ## 报告漏洞
 
-请**不要**公开 issue 报告安全漏洞。请发送邮件到仓库维护者（GitHub 主页可查），或通过 GitHub Security Advisory 私密提交。
+请勿在公开 issue 中提交利用细节、真实密钥或机密文档。优先使用仓库 Security 页面提供的 **Report a vulnerability**（如果维护者已启用私密报告）。入口：[Security Advisories](https://github.com/nanoandluna/pdf-studio-ai/security/advisories)。
 
-请在报告中包含：
+如果没有私密报告入口，可以开一个仅请求联系渠道的 issue，先不要发布漏洞细节。本项目由个人维护，没有固定响应时限承诺。
 
-- 漏洞类型与影响范围
-- 复现步骤（尽量精简）
-- 受影响的版本
-- 修复建议（可选）
+请提供受影响的版本/commit、影响范围、最小复现步骤和可公开的样例。维护者会评估当前主分支上的修复；旧安装包可能落后于源码。
 
-我们会在 7 天内确认，并在修复后同步公开。
+## 当前安全边界
 
-## 安全基线
+- Electron renderer 启用 sandbox、contextIsolation，关闭 nodeIntegration。preload 只提供明确的 API；IPC 验证主窗口和主 frame；禁止页面导航与 webview。
+- 文件读写受主进程对话框/最近文件授权限制。拖拽只使用浏览器提供的 File 字节，首次保存另选输出路径。PDF 写入先落到同目录临时文件，完成后替换目标文件。
+- 外链仅通过系统浏览器打开 HTTPS 链接；AI 远程接口要求 HTTPS，仅允许本机 HTTP。
+- 各 AI 服务的配置与密钥分别存储在 `safeStorage` 加密数据中；系统加密不可用时拒绝保存。操作系统账户被攻破不在该加密保证范围内。
+- Markdown 链接限制为 HTTPS 或内部页码。文档/模型输出是不可信数据；AI 修改必须经用户确认。
+- 生产构建不暴露测试 store。冒烟的 fixture 路径注入仅允许在未打包开发环境中使用。
 
-本项目遵循以下安全基线：
+## 数据与依赖
 
-- **Electron**：`contextIsolation: true`、`nodeIntegration: false`、API 经 `contextBridge` 白名单暴露
-- **文件访问**：renderer 只能读写主进程白名单内的路径（对话框/最近文件中出现过的路径）
-- **外链**：仅放行 `https://` 用系统浏览器打开
-- **敏感信息**：API Key 经系统 `safeStorage` 加密存储（`secure:*` IPC），key 白名单：`ai.apiKey` / `ai.provider`；`safeStorage` 不可用时**拒绝存储**（不降级为明文/可逆编码）
-- **AI 输出**：Markdown 渲染对链接做协议白名单（仅 `https://` 与内部 `#page-N`），防止注入
-- **AI 行为**：破坏性 PDF 操作必须经用户确认（Action Proposal），可撤销，AI 不能悄悄修改 PDF
-- **日志**：Logger 对 apiKey/token/secret 递归脱敏
+PDF 默认不会上传。远程 AI 会接收提问、聊天上下文与相关 PDF 文本，遵循所选服务的政策；本机 AI endpoint 的行为由使用者控制。OCR 在本地运行，但资源下载依赖第三方 CDN；完整离线 OCR 尚未实现。
+
+开发工具依赖也可能出现安全公告。使用 `npm audit --registry=https://registry.npmjs.org` 检查完整依赖；用 `--omit=dev` 区分 npm 运行时依赖。Electron 虽列在 devDependencies 中仍随桌面软件发布，必须独立跟进 Electron 安全更新，不能把 production audit 的结果当作安装包的全面安全证明。
