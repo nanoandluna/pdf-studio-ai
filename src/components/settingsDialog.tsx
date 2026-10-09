@@ -12,7 +12,8 @@ import { Dialog } from './modal';
 import { Button, Badge, Input, Spinner, Divider } from './ui';
 import { Dropdown } from './ui/dropdown';
 import { IconCheck, IconLoading, IconSpark } from './icons';
-import { toastSuccess } from './toast';
+import { toastSuccess, toastError } from './toast';
+import { APP_VERSION } from '@lib/version';
 import type { AIProviderConfig, ProviderId } from '@domain/types';
 
 type SettingsSection = 'general' | 'appearance' | 'ai' | 'pdf' | 'ocr' | 'shortcuts' | 'about';
@@ -88,16 +89,8 @@ function GeneralSection(): JSX.Element {
   const update = useSettingsStore((s) => s.update);
   return (
     <Section title="通用">
-      <Row label="语言" desc="界面显示语言">
-        <Dropdown
-          className="w-40"
-          value={settings.language}
-          onChange={(v) => update({ language: v })}
-          items={[
-            { label: '简体中文', value: 'zh-CN' },
-            { label: 'English', value: 'en-US' },
-          ]}
-        />
+      <Row label="界面语言" desc="当前版本提供简体中文界面">
+        <Badge>简体中文</Badge>
       </Row>
       <Row label="AI 数据外发提示" desc="发送内容到云 AI 前显示提示">
         <button
@@ -155,7 +148,7 @@ function AppearanceSection(): JSX.Element {
 
 // ---------------- AI ----------------
 function AiSection(): JSX.Element {
-  const { providerId, selectProvider, config, saveConfig, testConnection, activeModel, selectModel } = useAiStore();
+  const { providerId, selectProvider, config, saveConfig, testConnection, activeModel, chatError } = useAiStore();
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [model, setModel] = useState('');
@@ -164,6 +157,7 @@ function AiSection(): JSX.Element {
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   useEffect(() => {
+    setApiKeyInput('');
     setBaseUrl(config.baseUrl);
     setModel(config.model);
     setTemperature(config.temperature);
@@ -173,23 +167,23 @@ function AiSection(): JSX.Element {
 
   const onSaveCurrent = async () => {
     const apiKeyChanged = apiKeyInput.trim() !== '';
-    await saveConfig(
-      { baseUrl: baseUrl.trim(), model: model.trim(), temperature: Number(temperature) || 0.7, enabled: true },
+    const saved = await saveConfig(
+      { baseUrl: baseUrl.trim(), model: model.trim(), temperature: Number(temperature), enabled: true },
       apiKeyChanged ? apiKeyInput.trim() : undefined
     );
-    setApiKeyInput('');
-    toastSuccess('AI 配置已保存');
+    if (saved) { setApiKeyInput(''); toastSuccess('AI 配置已保存'); }
+    else toastError(useAiStore.getState().chatError ?? '保存失败');
   };
 
   const onTest = async (id: ProviderId) => {
+    if (id !== providerId) return;
     setTesting(id);
-    // 保存当前编辑中的配置先
-    if (id === providerId) {
-      await saveConfig({ baseUrl: baseUrl.trim(), model: model.trim(), temperature: Number(temperature) || 0.7 });
-    }
-    const result = await testConnection();
-    setTestResults((r) => ({ ...r, [id]: result }));
-    setTesting(null);
+    try {
+      const saved = await saveConfig({ baseUrl: baseUrl.trim(), model: model.trim(), temperature: Number(temperature) }, apiKeyInput.trim() || undefined);
+      const result = saved ? await testConnection() : { ok: false, message: useAiStore.getState().chatError ?? '保存配置失败' };
+      setTestResults(r => ({ ...r, [id]: result }));
+    } finally { setTesting(null); }
+
   };
 
   return (
@@ -198,7 +192,7 @@ function AiSection(): JSX.Element {
       <div className="space-y-2">
         {providers.map((p) => {
           const isCurrent = p.id === providerId;
-          const isConfigured = config.apiKey !== '' || p.id === 'ollama';
+          const isConfigured = isCurrent && (config.apiKey !== '' || p.id === 'ollama');
           return (
             <div
               key={p.id}
@@ -223,7 +217,7 @@ function AiSection(): JSX.Element {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Button size="sm" variant="ghost" onClick={() => onTest(p.id)} disabled={testing === p.id}>
+                  <Button size="sm" variant="ghost" onClick={() => onTest(p.id)} disabled={!isCurrent || testing !== null}>
                     {testing === p.id ? <Spinner size={12} /> : '测试'}
                   </Button>
                   <Button size="sm" variant={isCurrent ? 'primary' : 'secondary'} onClick={() => selectProvider(p.id)}>
@@ -242,7 +236,7 @@ function AiSection(): JSX.Element {
       </div>
 
       {/* 当前 Provider 配置表单 */}
-      {providerId !== 'ollama' && (
+      {(
         <div className="mt-4 space-y-3 rounded-lg border border-app-border p-3">
           <div className="text-[13px] font-medium text-fg">配置 · {providerRegistry.get(providerId).name}</div>
           <Input
@@ -282,6 +276,7 @@ function AiSection(): JSX.Element {
         </div>
       )}
 
+      {chatError && <p className="mt-2 text-xs text-danger">{chatError}</p>}
       {/* Ollama 提示 */}
       {providerId === 'ollama' && (
         <div className="mt-4 rounded-lg border border-app-border p-3 text-xs text-fg-muted">
@@ -300,17 +295,8 @@ function PdfSection(): JSX.Element {
       <Row label="PDF 引擎" desc="当前使用 PDF.js（Apache-2.0）">
         <Badge tone="accent">PDF.js</Badge>
       </Row>
-      <Row label="渲染质量" desc="页面渲染的像素密度">
-        <Dropdown
-          className="w-40"
-          value="auto"
-          onChange={() => undefined}
-          items={[
-            { label: '自动（推荐）', value: 'auto' },
-            { label: '高清', value: 'high' },
-            { label: '标准', value: 'standard' },
-          ]}
-        />
+      <Row label="渲染质量" desc="根据窗口缩放和屏幕像素密度自动调整">
+        <Badge>自动</Badge>
       </Row>
     </Section>
   );
@@ -323,7 +309,7 @@ function OcrSection(): JSX.Element {
         <Badge tone="info">chi_sim + eng</Badge>
       </Row>
       <div className="rounded-lg border border-app-border bg-app-panel p-3 text-xs leading-relaxed text-fg-muted">
-        首次使用 OCR 会从 CDN 下载语言模型（约 10MB），之后可离线使用。识别结果会写入搜索索引，支持全文搜索。
+        首次使用 OCR 会从 CDN 下载识别引擎及语言模型，需要网络连接。语言模型会缓存；完全离线运行尚未保证。识别结果会写入搜索索引，支持全文搜索。
       </div>
     </Section>
   );
@@ -358,7 +344,7 @@ function AboutSection(): JSX.Element {
         </div>
         <h3 className="text-lg font-bold text-fg">PDF Studio AI</h3>
         <p className="mt-0.5 text-sm text-fg-muted">Local-first AI PDF Workspace</p>
-        <p className="text-xs text-fg-subtle">Version 0.2.0</p>
+        <p className="text-xs text-fg-subtle">Version {APP_VERSION}</p>
         <div className="mx-auto mt-4 max-w-[260px] space-y-1 text-left text-xs text-fg-muted">
           <div className="flex justify-between"><span>PDF Engine</span><span className="text-fg">PDF.js</span></div>
           <div className="flex justify-between"><span>AI</span><span className="text-fg">OpenAI Compatible</span></div>

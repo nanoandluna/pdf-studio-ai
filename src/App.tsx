@@ -18,7 +18,7 @@ import { SplitDialog } from '@components/splitDialog';
 import { OcrDialog } from '@components/ocrDialog';
 import { CommandPalette } from '@components/commandPalette';
 import { ToastHost, toastSuccess } from '@components/toast';
-import { useDocumentStore } from '@stores/documentStore';
+import { useDocumentStore, viewEngine } from '@stores/documentStore';
 import { useViewerStore } from '@stores/viewerStore';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useRecentFilesStore } from '@stores/recentFilesStore';
@@ -27,10 +27,13 @@ import { useWorkspaceStore } from '@stores/workspaceStore';
 import { searchIndex } from '@search/index';
 import { Dialog } from '@components/modal';
 import { Button } from '@components/ui';
+import { APP_VERSION } from '@lib/version';
+import { runDocumentAction } from '@lib/documentAction';
+import { toastError } from '@components/toast';
 import { MENU_CHANNELS, menuStoreAction, type MenuChannel } from '@lib/menuChannels';
 
 // 暴露 store 用于自动化测试 / 调试（不影响生产行为）
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.VITE_SMOKE_TEST === '1')) {
   (window as unknown as { __pdfStudioTest__?: unknown }).__pdfStudioTest__ = {
     document: useDocumentStore,
     viewer: useViewerStore,
@@ -43,6 +46,10 @@ if (typeof window !== 'undefined') {
 
 export default function App(): JSX.Element {
   const document = useDocumentStore((s) => s.document);
+  const documentError = useDocumentStore((s) => s.error);
+  useEffect(() => {
+    if (documentError) { toastError(documentError); useDocumentStore.getState().clearError(); }
+  }, [documentError]);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
@@ -62,18 +69,29 @@ export default function App(): JSX.Element {
     loadAiConfig();
   }, [loadSettings, loadRecent, loadAiConfig]);
 
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      const state = useDocumentStore.getState();
+      if (state.dirty || state.saving) { e.preventDefault(); e.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
   // 打开文档时预填充搜索索引（文本层）
   useEffect(() => {
     if (!document) {
       searchIndex.clear();
       return;
     }
+    useAiStore.setState({ messages: [], pendingActions: [], insights: null, insightsLoading: false, thinking: false, streaming: false, streamingText: '', toolSteps: [] });
     // 文档切换（A→B）时先清掉上一份文档的索引，避免跨文档污染
     searchIndex.clear();
+    let cancelled = false;
     const loadText = async () => {
       try {
-        const { viewEngine } = await import('@stores/documentStore');
         const texts = await viewEngine.extractText(document.id);
+        if (cancelled) return;
         for (const [pageIndex, text] of texts) {
           if (text.trim()) {
             searchIndex.setPage({ pageIndex, text, source: 'text-layer' });
@@ -84,13 +102,14 @@ export default function App(): JSX.Element {
       }
     };
     loadText();
+    return () => { cancelled = true; };
   }, [document?.id]);
 
   // 全局快捷键（仅保留未被原生菜单 accelerator 接管的按键）
   // 注：Ctrl+O/S/Z/F、Ctrl+=/-/0、Ctrl+Shift+R、Ctrl+E 等组合键由
   // 主进程菜单 accelerator 触发 → menu:* 事件，见下方菜单事件注册。
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = async (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       const doc = useDocumentStore.getState();
 
@@ -100,6 +119,8 @@ export default function App(): JSX.Element {
         setPaletteOpen(true);
         return;
       }
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]') || window.document.querySelector('[role="dialog"]')) return;
       // PageUp / PageDown 翻页
       if (e.key === 'PageUp') {
         e.preventDefault();
@@ -116,9 +137,10 @@ export default function App(): JSX.Element {
         const { selectedPages } = useViewerStore.getState();
         if (selectedPages.size > 0) {
           e.preventDefault();
-          doc.deletePages(Array.from(selectedPages));
-          useViewerStore.getState().clearSelection();
-          toastSuccess(`已删除 ${selectedPages.size} 页`);
+          if (await runDocumentAction(() => doc.deletePages(Array.from(selectedPages)))) {
+            useViewerStore.getState().clearSelection();
+            toastSuccess(`已删除 ${selectedPages.size} 页`);
+          }
         }
       }
     };
@@ -212,7 +234,7 @@ function AboutDialog({ open, onClose }: { open: boolean; onClose: () => void }):
         </div>
         <h2 className="text-lg font-bold text-fg">PDF Studio AI</h2>
         <p className="mt-1 text-sm text-fg-muted">Local-first AI PDF Workspace</p>
-        <p className="mt-0.5 text-xs text-fg-subtle">Version 0.2.0</p>
+        <p className="mt-0.5 text-xs text-fg-subtle">Version {APP_VERSION}</p>
         <div className="mx-auto mt-4 max-w-[260px] space-y-1 text-left text-xs text-fg-muted">
           <div className="flex justify-between"><span>PDF Engine</span><span className="text-fg">PDF.js</span></div>
           <div className="flex justify-between"><span>AI</span><span className="text-fg">OpenAI Compatible</span></div>

@@ -43,7 +43,7 @@ export class PdfjsViewEngine implements PdfViewEngine {
 
   async open(data: ArrayBuffer, path: string, name: string): Promise<PdfDocument> {
     const id = crypto.randomUUID();
-    const doc = await pdfjsLib.getDocument({ data }).promise;
+    const doc = await pdfjsLib.getDocument({ data: data.slice(0) }).promise;
     const meta = await doc.getMetadata().catch(() => null);
     const info = (meta?.info ?? {}) as Record<string, unknown>;
     const fileSize = data.byteLength;

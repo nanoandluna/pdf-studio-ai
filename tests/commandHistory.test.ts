@@ -90,4 +90,17 @@ describe('CommandHistory', () => {
     expect(history.canRedo).toBe(false);
     expect(history.canUndo).toBe(false);
   });
+  it('AI command groups cannot undo later manual edits or exports', async () => {
+    const first = makeCommand('ai1', log, 'A');
+    const second = makeCommand('ai2', log, 'B');
+    await history.execute(first);
+    await history.execute(second);
+    expect(history.canUndoCommands([first.id, second.id])).toBe(true);
+    await history.execute(makeCommand('manual', log, 'C'));
+    expect(history.canUndoCommands([first.id, second.id])).toBe(false);
+    expect(history.canUndoCommands([])).toBe(false);
+    await history.undo();
+    expect(history.canUndoCommands([first.id, second.id])).toBe(true);
+  });
+
 });

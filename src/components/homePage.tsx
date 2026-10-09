@@ -20,16 +20,7 @@ export function HomePage(): JSX.Element {
       toastError('仅支持 PDF 文件');
       return;
     }
-    // Electron 渲染进程无法直接读本地路径 —— 通过主进程按路径打开
-    const path = (file as File & { path?: string }).path;
-    if (path) {
-      openFile(path);
-    } else {
-      // 兜底：用 File 对象转 ArrayBuffer
-      file.arrayBuffer().then((buf) => {
-        useDocumentStore.getState().openBytes(buf, file.name, file.name);
-      }).catch(() => toastError('无法读取该文件'));
-    }
+    void useDocumentStore.getState().openDroppedFile(file);
   };
 
   return (

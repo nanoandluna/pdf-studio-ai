@@ -7,7 +7,7 @@ import electron from 'electron';
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
+import { writeFileAtomic } from './fileIO';
 import { buildMenuTemplate } from './menuTemplate';
 import type { MenuChannel } from './menuChannels';
 
@@ -112,12 +112,12 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
   mainWindow = win;
 
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => { if (app.isPackaged || process.env.PDF_STUDIO_SMOKE !== '1') win.show(); });
 
   if (isDev) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL!);
@@ -129,6 +129,13 @@ function createWindow(): void {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  win.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  win.webContents.on('will-prevent-unload', (event) => {
+    const response = dialog.showMessageBoxSync(win, { type: 'warning', buttons: ['继续编辑', '放弃更改并关闭'], defaultId: 0, cancelId: 0, message: '文档有未保存的更改或正在保存。', detail: '关闭后未保存的更改将丢失。' });
+    if (response === 1) event.preventDefault();
   });
 
   win.on('maximize', () => win.webContents.send('window:maximized', true));
@@ -148,8 +155,24 @@ function createMenu(): void {
 
 // ============ IPC 处理器 ============
 function registerIpc(): void {
+  // Reject privileged calls from other windows or child frames.
+  const handle = (channel: string, listener: Parameters<typeof ipcMain.handle>[1]) => {
+    ipcMain.handle(channel, (event, ...args) => {
+      if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error('无权调用该操作');
+      return listener(event, ...args);
+    });
+  };
+  handle('document:confirmDiscard', async () => {
+    const { response } = await dialog.showMessageBox(mainWindow!, { type: 'warning', buttons: ['继续编辑', '放弃更改'], defaultId: 0, cancelId: 0, message: '当前文档有未保存的更改。', detail: '放弃后将无法恢复，请先保存需要保留的更改。' });
+    return response === 1;
+  });
+  handle('ai:confirmSend', async (_event, baseUrl: string) => {
+    const host = new URL(baseUrl).host;
+    const { response } = await dialog.showMessageBox(mainWindow!, { type: 'question', buttons: ['取消', '发送'], defaultId: 0, cancelId: 0, message: '是否将内容发送到 AI 服务？', detail: `所选文档文本、提问和聊天上下文将发送到 ${host}。服务商可能按照其政策处理这些数据。` });
+    return response === 1;
+  });
   // ---- 文件对话框 ----
-  ipcMain.handle('dialog:openFile', async (_e, opts) => {
+  handle('dialog:openFile', async (_e, opts) => {
     const res = await dialog.showOpenDialog(mainWindow!, {
       title: opts?.title ?? '打开 PDF',
       filters: opts?.filters ?? [{ name: 'PDF', extensions: ['pdf'] }],
@@ -167,7 +190,7 @@ function registerIpc(): void {
     };
   });
 
-  ipcMain.handle('dialog:openFiles', async (_e, opts) => {
+  handle('dialog:openFiles', async (_e, opts) => {
     const res = await dialog.showOpenDialog(mainWindow!, {
       title: opts?.title ?? '选择 PDF 文件',
       filters: opts?.filters ?? [{ name: 'PDF', extensions: ['pdf'] }],
@@ -187,7 +210,7 @@ function registerIpc(): void {
     return { cancelled: false, files };
   });
 
-  ipcMain.handle('dialog:saveFile', async (_e, opts) => {
+  handle('dialog:saveFile', async (_e, opts) => {
     const res = await dialog.showSaveDialog(mainWindow!, {
       title: opts?.title ?? '保存 PDF',
       defaultPath: opts?.defaultPath ?? 'document.pdf',
@@ -198,7 +221,7 @@ function registerIpc(): void {
     return { cancelled: false, path: res.filePath };
   });
 
-  ipcMain.handle('dialog:selectDirectory', async () => {
+  handle('dialog:selectDirectory', async () => {
     const res = await dialog.showOpenDialog(mainWindow!, {
       title: '选择输出目录',
       properties: ['openDirectory', 'createDirectory'],
@@ -209,23 +232,25 @@ function registerIpc(): void {
   });
 
   // ---- 文件读写（白名单：只允许对话框/最近文件中出现过的路径）----
-  ipcMain.handle('fs:readFile', async (_e, p: string) => {
+  handle('fs:readFile', async (_e, p: string) => {
     if (!isAllowedPath(p)) throw new Error('无权读取该路径');
     const data = await readFileWithLimit(p);
     return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   });
 
-  ipcMain.handle('fs:writeFile', async (_e, p: string, data: Uint8Array) => {
+  handle('fs:writeFile', async (_e, p: string, data: Uint8Array) => {
     if (!isAllowedPath(p)) throw new Error('无权写入该路径');
-    await fs.promises.writeFile(p, Buffer.from(data));
+    if (path.extname(p).toLowerCase() !== '.pdf') throw new Error('只能保存 PDF 文件');
+    if (!(data instanceof Uint8Array)) throw new Error('无效的文件数据');
+    await writeFileAtomic(p, Buffer.from(data));
   });
 
-  ipcMain.handle('fs:exists', (_e, p: string) => isAllowedPath(p) && fs.existsSync(p));
+  handle('fs:exists', (_e, p: string) => isAllowedPath(p) && fs.existsSync(p));
 
   // ---- 最近文件 ----
-  ipcMain.handle('recent:list', () => readJson(fileOf('recent-files.json'), []));
+  handle('recent:list', () => readJson(fileOf('recent-files.json'), []));
 
-  ipcMain.handle('recent:add', (_e, entry) => {
+  handle('recent:add', (_e, entry) => {
     // 安全收紧（OSS 审查 P0）：只有「已在白名单」的路径才允许加入最近文件。
     // 白名单来源 = 本会话 dialog 成功打开过 + 启动时预加载的既有 recent 路径。
     // renderer 无法用任意 .pdf 路径给白名单“开新入口”。
@@ -249,50 +274,51 @@ function registerIpc(): void {
     return withAvailability;
   });
 
-  ipcMain.handle('recent:remove', (_e, p: string) => {
+  handle('recent:remove', (_e, p: string) => {
     const list = readJson<unknown[]>(fileOf('recent-files.json'), []).filter(
       (f) => (f as { path: string }).path !== p
     );
     writeJson(fileOf('recent-files.json'), list);
   });
 
-  ipcMain.handle('recent:clear', () => writeJson(fileOf('recent-files.json'), []));
+  handle('recent:clear', () => writeJson(fileOf('recent-files.json'), []));
 
   // ---- 设置 ----
-  ipcMain.handle('settings:get', () =>
+  handle('settings:get', () =>
     readJson(fileOf('settings.json'), { theme: 'system', language: 'zh-CN', aiDataNotice: true })
   );
-  ipcMain.handle('settings:set', (_e, settings) => writeJson(fileOf('settings.json'), settings));
+  handle('settings:set', (_e, settings) => writeJson(fileOf('settings.json'), settings));
 
   // ---- 安全存储（key 白名单 + safeStorage 加密）----
-  ipcMain.handle('secure:get', (_e, key: string) => {
-    if (!SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
+  handle('secure:get', (_e, key: string) => {
+    if (typeof key !== 'string' || !SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
     const secrets = readJson<Record<string, string>>(fileOf('secrets.json'), {});
     return decryptValue(secrets[key] ?? '');
   });
-  ipcMain.handle('secure:set', (_e, key: string, value: string) => {
-    if (!SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
+  handle('secure:set', (_e, key: string, value: string) => {
+    if (typeof key !== 'string' || !SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
+    if (typeof value !== 'string') throw new Error('无效的存储值');
     const secrets = readJson<Record<string, string>>(fileOf('secrets.json'), {});
     secrets[key] = encryptValue(value); // safeStorage 不可用时抛错（不降级）
     writeJson(fileOf('secrets.json'), secrets);
   });
-  ipcMain.handle('secure:delete', (_e, key: string) => {
-    if (!SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
+  handle('secure:delete', (_e, key: string) => {
+    if (typeof key !== 'string' || !SECURE_KEYS.has(key)) throw new Error('非法的存储 key');
     const secrets = readJson<Record<string, string>>(fileOf('secrets.json'), {});
     delete secrets[key];
     writeJson(fileOf('secrets.json'), secrets);
   });
 
   // ---- 应用信息 / 窗口 ----
-  ipcMain.handle('app:version', () => app.getVersion());
-  ipcMain.handle('app:platform', () => process.platform);
-  ipcMain.handle('win:minimize', () => mainWindow?.minimize());
-  ipcMain.handle('win:maximize', () => {
+  handle('app:version', () => app.getVersion());
+  handle('app:platform', () => process.platform);
+  handle('win:minimize', () => mainWindow?.minimize());
+  handle('win:maximize', () => {
     if (mainWindow?.isMaximized()) mainWindow.unmaximize();
     else mainWindow?.maximize();
   });
-  ipcMain.handle('win:close', () => mainWindow?.close());
-  ipcMain.handle('win:isMaximized', () => mainWindow?.isMaximized() ?? false);
+  handle('win:close', () => mainWindow?.close());
+  handle('win:isMaximized', () => mainWindow?.isMaximized() ?? false);
 }
 
 // ============ 生命周期 ============
@@ -317,7 +343,7 @@ if (!gotLock) {
     }
     // 测试注入：冒烟脚本通过 SMOKE_FIXTURES 显式预加载 fixture 到白名单
     // （生产环境无此 env，不影响安全边界）
-    if (process.env.SMOKE_FIXTURES) {
+    if (!app.isPackaged && process.env.SMOKE_FIXTURES) {
       for (const p of process.env.SMOKE_FIXTURES.split(',')) {
         if (p) allowPath(p);
       }

@@ -1,3 +1,4 @@
+import { runDocumentAction } from '@lib/documentAction';
 // ============================================================
 // Toolbar — 顶部 Command Bar（V0.2）
 // 左：文件名 · 中：高频工具（按优先级）· 右：AI/更多
@@ -54,7 +55,7 @@ function Divider() {
 }
 
 export function Toolbar({ onOpenPalette }: { onOpenPalette?: () => void }): JSX.Element {
-  const { document, loading, dirty, undo, redo, deletePages, openFile, save } = useDocumentStore();
+  const { document, loading, saving, dirty, undo, redo, deletePages, openFile, save } = useDocumentStore();
   const { currentPage, nextPage, prevPage, gotoPage, zoomIn, zoomOut, fitWidth, fitPage, scale, setSearchOpen, selectedPages, clearSelection } = useViewerStore();
   const { toggleSidebar, sidebarCollapsed, toggleAiPanel, aiPanelOpen } = useWorkspaceStore();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -88,7 +89,7 @@ export function Toolbar({ onOpenPalette }: { onOpenPalette?: () => void }): JSX.
       <ToolButton title="打开 PDF (Ctrl+O)" onClick={() => openFile()}>
         <IconOpen width={15} height={15} />
       </ToolButton>
-      <ToolButton title="保存 (Ctrl+S)" onClick={() => save(false)} disabled={!docLoaded || loading}>
+      <ToolButton title="保存 (Ctrl+S)" onClick={() => save(false)} disabled={!docLoaded || loading || saving}>
         <IconSave width={15} height={15} />
       </ToolButton>
 
@@ -157,10 +158,9 @@ export function Toolbar({ onOpenPalette }: { onOpenPalette?: () => void }): JSX.
                 onMerge={() => { window.dispatchEvent(new CustomEvent('menu:merge')); setMoreOpen(false); }}
                 onSplit={() => { window.dispatchEvent(new CustomEvent('menu:split')); setMoreOpen(false); }}
                 onOcr={() => { window.dispatchEvent(new CustomEvent('menu:ocr')); setMoreOpen(false); }}
-                onDelete={() => {
+                onDelete={async () => {
                   if (hasSelection) {
-                    deletePages(Array.from(selectedPages));
-                    clearSelection();
+                    if (await runDocumentAction(() => deletePages(Array.from(selectedPages)))) clearSelection();
                   }
                   setMoreOpen(false);
                 }}

@@ -4,15 +4,16 @@
 // ============================================================
 
 import { create } from 'zustand';
-import type { PdfDocument, PdfPage, Annotation } from '@domain/types';
+import type { PdfDocument } from '@domain/types';
 import { PdfjsViewEngine } from '@engine/pdfjsEngine';
-import { PdfLibEditEngine, identityOperations, applyOperations } from '@engine/pdfLibEngine';
+import { PdfLibEditEngine } from '@engine/pdfLibEngine';
 import type { PdfEditOperations } from '@engine/types';
 import { CommandHistory, type PdfCommand } from '@commands/types';
 import { logger } from '@lib/logger';
 import { FriendlyError, toFriendlyError } from '@lib/errors';
 import { cancelAiRequests } from '@lib/aiAbort';
 import { useRecentFilesStore } from './recentFilesStore';
+import { useViewerStore } from './viewerStore';
 
 export const viewEngine = new PdfjsViewEngine();
 export const editEngine = new PdfLibEditEngine();
@@ -21,6 +22,10 @@ export const commandHistory = new CommandHistory();
 /** 打开文档时的原始字节缓存（保存时重建用） */
 let sourceBytes: ArrayBuffer | null = null;
 let sourcePath = '';
+let savedOperations = '';
+function operationKey(state: Pick<DocumentState, 'pageOrder' | 'pageRotations' | 'deletedPages'>): string {
+  return JSON.stringify([state.pageOrder, state.pageOrder.map(i => state.pageRotations[i] ?? 0), [...state.deletedPages].sort((a,b) => a-b)]);
+}
 
 export interface PageThumb {
   index: number; // 原索引
@@ -44,15 +49,15 @@ interface DocumentState {
   pageSizes: Record<number, { w: number; h: number; rotate: number }>;
   /** 已删除页（原索引集合） */
   deletedPages: Set<number>;
-  /** 标注（按原页索引） */
-  annotations: Annotation[];
   thumbnails: PageThumb[];
   loading: boolean;
+  saving: boolean;
   error: string | null;
   dirty: boolean;
 
   // ---- 动作 ----
   openFile: (path?: string) => Promise<void>;
+  openDroppedFile: (file: File) => Promise<void>;
   openBytes: (data: ArrayBuffer, path: string, name: string) => Promise<void>;
   closeDocument: () => Promise<void>;
   save: (saveAs?: boolean) => Promise<boolean>;
@@ -66,12 +71,6 @@ interface DocumentState {
 
   undo: () => Promise<void>;
   redo: () => Promise<void>;
-
-  // ---- 标注 ----
-  addAnnotation: (ann: Annotation) => void;
-  updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
-  removeAnnotation: (id: string) => void;
-  clearAnnotations: () => void;
 
   // ---- 缩略图 ----
   loadThumbnails: () => Promise<void>;
@@ -87,9 +86,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   pageRotations: {},
   pageSizes: {},
   deletedPages: new Set(),
-  annotations: [],
   thumbnails: [],
   loading: false,
+  saving: false,
   error: null,
   dirty: false,
 
@@ -125,17 +124,28 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }
   },
 
+  openDroppedFile: async (file) => {
+    try {
+      if (!file.name.toLowerCase().endsWith('.pdf')) throw new FriendlyError('仅支持 PDF 文件。');
+      if (file.size > 100 * 1024 * 1024) throw new FriendlyError('文件过大，超过 100 MB 上限。');
+      // A browser File grants access only to these bytes, never to an arbitrary disk path.
+      await get().openBytes(await file.arrayBuffer(), '', file.name);
+    } catch (e) {
+      set({ error: toFriendlyError(e, '无法读取该文件。').friendly });
+    }
+  },
+
   openBytes: async (data, path, name) => {
+    if (get().loading || get().saving) return;
+    if (get().dirty && !(await window.pdfStudio.confirmDiscard())) return;
+    if (get().loading || get().saving) return;
     set({ loading: true, error: null });
     // #8：文档切换时取消在途 AI 请求（避免流式写脏/对旧 doc 提取文本）
     cancelAiRequests();
     try {
-      // 释放旧文档
+      // Only replace the previous document after the new file has loaded.
       const old = get().document;
-      if (old) await viewEngine.dispose(old.id).catch(() => undefined);
       const doc = await viewEngine.open(data, path, name);
-      sourceBytes = data;
-      sourcePath = path;
       const pageCount = doc.pageCount;
       // 预取每页原始尺寸（布局 placeholder，与渲染无关 —— Layout/Render 分离）
       const sizes: Record<number, { w: number; h: number; rotate: number }> = {};
@@ -149,20 +159,24 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             .catch(() => undefined)
         )
       );
+      if (old) await viewEngine.dispose(old.id).catch(() => undefined);
+      sourceBytes = data.slice(0);
+      sourcePath = path;
+      useViewerStore.setState({ currentPage: 0, navTarget: null, selectedPages: new Set(), selection: null, searchQuery: '' });
       set({
         document: doc,
         pageOrder: Array.from({ length: pageCount }, (_, i) => i),
         pageRotations: {},
         pageSizes: sizes,
         deletedPages: new Set(),
-        annotations: [],
         thumbnails: [],
         dirty: false,
         loading: false,
       });
       commandHistory.clear();
+      savedOperations = operationKey(get());
       // 记录最近文件
-      await useRecentFilesStore.getState().add({
+      if (path) await useRecentFilesStore.getState().add({
         path,
         name,
         lastOpenedAt: Date.now(),
@@ -177,12 +191,15 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
 
   closeDocument: async () => {
+    if (get().loading || get().saving) return;
+    if (get().dirty && !(await window.pdfStudio.confirmDiscard())) return;
     // #8：关闭文档时取消在途 AI 请求
     cancelAiRequests();
     const { document } = get();
     if (document) await viewEngine.dispose(document.id).catch(() => undefined);
     sourceBytes = null;
     sourcePath = '';
+    savedOperations = '';
     commandHistory.clear();
     set({
       document: null,
@@ -190,7 +207,6 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       pageRotations: {},
       pageSizes: {},
       deletedPages: new Set(),
-      annotations: [],
       thumbnails: [],
       dirty: false,
       error: null,
@@ -209,11 +225,14 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
 
   save: async (saveAs = false) => {
+    if (get().loading || get().saving) return false;
     const { document, pageOrder, pageRotations, deletedPages } = get();
     if (!document || !sourceBytes) {
       set({ error: '当前没有打开的文档，无法保存。' });
       return false;
     }
+    set({ saving: true });
+    const snapshotKey = operationKey(get());
     try {
       const ops: PdfEditOperations = {
         pageOrder,
@@ -232,24 +251,26 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         outPath = res.path;
       }
       await window.pdfStudio.writeFile(outPath, bytes);
-      // 保存后：sourceBytes 更新为新内容，文档复位为"未修改"
-      const savedBytes = new Uint8Array(bytes);
-      sourceBytes = savedBytes.buffer.slice(savedBytes.byteOffset, savedBytes.byteOffset + savedBytes.byteLength) as ArrayBuffer;
+      // Retain the original bytes and indexes so repeated saves and undo stay correct.
+      savedOperations = snapshotKey;
       sourcePath = outPath;
       set({
-        dirty: false,
+        dirty: operationKey(get()) !== savedOperations,
         document: {
           ...document,
           path: outPath,
           name: outPath.split(/[\\/]/).pop() || document.name,
-          modified: false,
+          modified: operationKey(get()) !== savedOperations,
         },
       });
+      await useRecentFilesStore.getState().add({ path: outPath, name: outPath.split(/[\\/]/).pop() || document.name, lastOpenedAt: Date.now(), pageCount: pageOrder.filter(i => !deletedPages.has(i)).length }).catch(() => undefined);
       return true;
     } catch (e) {
       const err = toFriendlyError(e, '保存失败，请检查文件是否被占用或路径是否可写。');
       set({ error: err.friendly });
       return false;
+    } finally {
+      set({ saving: false });
     }
   },
 
@@ -258,8 +279,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   deletePages: async (pageIndexes) => {
     const { document, deletedPages } = get();
     if (!document) return;
-    const toDelete = pageIndexes.filter((i) => !deletedPages.has(i));
+    const toDelete = [...new Set(pageIndexes)].filter(i => get().pageOrder.includes(i) && !deletedPages.has(i));
     if (toDelete.length === 0) return;
+    if (get().pageOrder.filter(i => !deletedPages.has(i)).length <= toDelete.length) {
+      throw new FriendlyError('至少需要保留一页，无法删除全部页面。');
+    }
     const cmd: PdfCommand = {
       id: crypto.randomUUID(),
       name: '删除页面',
@@ -267,12 +291,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       execute: async () => {
         const next = new Set(get().deletedPages);
         toDelete.forEach((i) => next.add(i));
-        set({ deletedPages: next, dirty: true });
+        set({ deletedPages: next, dirty: operationKey({ ...get(), deletedPages: next }) !== savedOperations });
       },
       undo: async () => {
         const next = new Set(get().deletedPages);
         toDelete.forEach((i) => next.delete(i));
-        set({ deletedPages: next, dirty: true });
+        set({ deletedPages: next, dirty: operationKey({ ...get(), deletedPages: next }) !== savedOperations });
       },
     };
     await commandHistory.execute(cmd);
@@ -281,7 +305,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   rotatePages: async (pageIndexes, angle) => {
     const { document, pageRotations } = get();
     if (!document) return;
+    if (!Number.isFinite(angle) || angle % 90 !== 0) throw new FriendlyError('旋转角度必须是 90° 的倍数。');
+    pageIndexes = [...new Set(pageIndexes)].filter(i => get().pageOrder.includes(i) && !get().deletedPages.has(i));
     const norm = ((angle % 360) + 360) % 360;
+    if (!pageIndexes.length || norm === 0) return;
     const cmd: PdfCommand = {
       id: crypto.randomUUID(),
       name: '旋转页面',
@@ -291,7 +318,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         pageIndexes.forEach((i) => {
           next[i] = ((next[i] ?? 0) + norm) % 360;
         });
-        set({ pageRotations: next, dirty: true });
+        set({ pageRotations: next, dirty: operationKey({ ...get(), pageRotations: next }) !== savedOperations });
         // 刷新缩略图
         for (const i of pageIndexes) await get().refreshThumbnail(i);
       },
@@ -300,7 +327,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         pageIndexes.forEach((i) => {
           next[i] = ((next[i] ?? 0) - norm + 360) % 360;
         });
-        set({ pageRotations: next, dirty: true });
+        set({ pageRotations: next, dirty: operationKey({ ...get(), pageRotations: next }) !== savedOperations });
         for (const i of pageIndexes) await get().refreshThumbnail(i);
       },
     };
@@ -310,7 +337,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   reorderPages: async (newOrder) => {
     const { document, pageOrder } = get();
     if (!document) return;
-    if (newOrder.length !== pageOrder.length) return;
+    if (newOrder.length !== pageOrder.length || new Set(newOrder).size !== pageOrder.length || newOrder.some(i => !pageOrder.includes(i))) throw new FriendlyError('页面顺序必须包含每一页且不能重复。');
     if (newOrder.every((v, i) => v === pageOrder[i])) return;
     const prev = [...pageOrder];
     const cmd: PdfCommand = {
@@ -318,22 +345,24 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       name: '调整页面顺序',
       description: '拖拽排序页面',
       execute: async () => {
-        set({ pageOrder: [...newOrder], dirty: true });
+        set({ pageOrder: [...newOrder], dirty: operationKey({ ...get(), pageOrder: newOrder }) !== savedOperations });
       },
       undo: async () => {
-        set({ pageOrder: prev, dirty: true });
+        set({ pageOrder: prev, dirty: operationKey({ ...get(), pageOrder: prev }) !== savedOperations });
       },
     };
     await commandHistory.execute(cmd);
   },
 
   extractPages: async (pageIndexes) => {
-    const { document } = get();
+    const { document, pageRotations, deletedPages } = get();
     if (!document || !sourceBytes) {
       set({ error: '当前没有打开的文档。' });
       return null;
     }
     try {
+      pageIndexes = [...new Set(pageIndexes)].filter(i => get().pageOrder.includes(i) && !deletedPages.has(i));
+      if (!pageIndexes.length) throw new FriendlyError('请选择至少一页。');
       const res = await window.pdfStudio.saveFileDialog({
         title: '提取页面为 PDF',
         defaultPath: `${document.name.replace(/\.pdf$/i, '')}-extract.pdf`,
@@ -342,7 +371,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       if (res.cancelled) return null;
       const ops: PdfEditOperations = {
         pageOrder: pageIndexes,
-        pageRotations: {},
+        pageRotations,
         deletedPages: [],
       };
       const bytes = await editEngine.build(sourceBytes, ops);
@@ -365,26 +394,6 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     if (cmd) logger.debug('Redo', { name: cmd.name });
   },
 
-  // ================= 标注 =================
-
-  addAnnotation: (ann) => {
-    set((s) => ({ annotations: [...s.annotations, ann] }));
-  },
-
-  updateAnnotation: (id, patch) => {
-    set((s) => ({
-      annotations: s.annotations.map((a) => (a.id === id ? { ...a, ...patch } : a)),
-    }));
-  },
-
-  removeAnnotation: (id) => {
-    set((s) => ({ annotations: s.annotations.filter((a) => a.id !== id) }));
-  },
-
-  clearAnnotations: () => {
-    set({ annotations: [] });
-  },
-
   // ================= 缩略图 =================
 
   loadThumbnails: async () => {
@@ -396,7 +405,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       try {
         const dataUrl = await viewEngine.renderPageToDataUrl(document.id, i, 0.5);
         thumbs[i] = { index: i, label: String(i + 1), dataUrl, width: 0, height: 0 };
-        set({ thumbnails: [...thumbs.filter(Boolean)] });
+        if (get().document?.id === document.id) set({ thumbnails: [...thumbs.filter(Boolean)] });
       } catch {
         // 忽略缩略图失败
       }

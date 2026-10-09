@@ -1,3 +1,4 @@
+import { runDocumentAction } from '@lib/documentAction';
 // ============================================================
 // Sidebar — 左侧导航（V0.2）
 // 支持 Icon 模式 / Icon+Label 模式 / Collapsed / Expanded
@@ -73,6 +74,7 @@ export function Sidebar(): JSX.Element | null {
         </button>
         <button
           title="帮助"
+          onClick={() => window.dispatchEvent(new CustomEvent('menu:about'))}
           className="rounded-md p-2 text-fg-muted transition-colors hover:bg-app-panel-hover hover:text-fg"
         >
           <IconHelp width={16} height={16} />
@@ -128,9 +130,10 @@ export function Sidebar(): JSX.Element | null {
   const onDeleteConfirm = async () => {
     const sel = Array.from(selectedPages);
     if (sel.length > 0) {
-      await deletePages(sel);
-      toastSuccess(`已删除 ${sel.length} 页`);
-      clearSelection();
+      if (await runDocumentAction(() => deletePages(sel))) {
+        toastSuccess(`已删除 ${sel.length} 页`);
+        clearSelection();
+      }
     }
     setConfirmDelete(false);
   };

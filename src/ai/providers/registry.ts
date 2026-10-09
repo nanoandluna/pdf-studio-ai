@@ -60,8 +60,8 @@ class OpenAICompatibleV2 implements AIProviderV2 {
       signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`AI 请求失败 (${res.status}): ${text.slice(0, 300)}`);
+      await res.body?.cancel().catch(() => undefined);
+      throw new Error(`AI 请求失败 (${res.status})，请检查模型、接口和权限。`);
     }
     const data = (await res.json()) as {
       choices?: { message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }; finish_reason?: string }[];
@@ -109,8 +109,8 @@ class OpenAICompatibleV2 implements AIProviderV2 {
       signal: AbortSignal.timeout(180_000),
     });
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`AI 请求失败 (${res.status}): ${text.slice(0, 300)}`);
+      await res.body?.cancel().catch(() => undefined);
+      throw new Error(`AI 请求失败 (${res.status})，请检查模型、接口和权限。`);
     }
     if (!res.body) throw new Error('AI 服务不支持流式响应');
 

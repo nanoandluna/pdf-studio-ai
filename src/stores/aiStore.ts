@@ -16,7 +16,17 @@ import { logger } from '@lib/logger';
 import { toFriendlyError } from '@lib/errors';
 import { beginAiRequest, currentAiRequestSeq } from '@lib/aiAbort';
 
+import { extractCitations as extractCitationsLocal } from '@ai/citations';
+import { defaultConfig, isLocalEndpoint, validateConfig } from '@ai/config';
+import { useSettingsStore } from './settingsStore';
+
 const SETTINGS_KEY = 'ai.provider';
+let providerProfiles: Partial<Record<ProviderId, AIProviderConfig>> = {};
+
+async function confirmSend(config: AIProviderConfig): Promise<boolean> {
+  if (!useSettingsStore.getState().settings.aiDataNotice || isLocalEndpoint(config.baseUrl)) return true;
+  return window.pdfStudio.confirmAiSend(config.baseUrl);
+}
 
 export interface ToolStep {
   label: string;
@@ -49,7 +59,7 @@ interface AiState {
   insightsLoading: boolean;
 
   loadConfig: () => Promise<void>;
-  saveConfig: (patch: Partial<AIProviderConfig>, apiKey?: string) => Promise<void>;
+  saveConfig: (patch: Partial<AIProviderConfig>, apiKey?: string) => Promise<boolean>;
   selectProvider: (id: ProviderId) => Promise<void>;
   selectModel: (model: string) => Promise<void>;
   setContextScope: (s: AIContextScope) => void;
@@ -82,13 +92,7 @@ export interface SendOptions {
   selectionPage?: number;
 }
 
-const DEFAULT_CONFIG: AIProviderConfig = {
-  baseUrl: 'https://api.openai.com/v1',
-  apiKey: '',
-  model: 'gpt-4o-mini',
-  temperature: 0.7,
-  enabled: false,
-};
+const DEFAULT_CONFIG = defaultConfig('deepseek');
 
 function buildDocumentContext(): { name: string; pageCount: number; currentPage: number; selectedText: string | null } | null {
   const doc = useDocumentStore.getState().document;
@@ -118,73 +122,45 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   loadConfig: async () => {
     try {
-      const apiKey = (await window.pdfStudio.secureGet('ai.apiKey')) ?? '';
-      const raw = (await window.pdfStudio.secureGet(SETTINGS_KEY)) ?? '';
-      const saved = (() => {
-        try {
-          return JSON.parse(raw) as Partial<AIProviderConfig> & { providerId?: ProviderId; activeModel?: string; contextScope?: AIContextScope };
-        } catch {
-          return {};
-        }
-      })();
-      const providerId = (saved.providerId ?? 'deepseek') as ProviderId;
-      const def = PROVIDER_DEFAULTS[providerId] ?? PROVIDER_DEFAULTS.deepseek;
-      set({
-        providerId,
-        activeModel: saved.activeModel ?? (def.models[0] ?? ''),
-        contextScope: (saved.contextScope as AIContextScope) ?? 'document',
-        config: {
-          ...DEFAULT_CONFIG,
-          ...def,
-          ...saved,
-          apiKey,
-        },
-        providerReady: true,
-      });
+      const raw = await window.pdfStudio.secureGet(SETTINGS_KEY);
+      const saved = JSON.parse(raw || '{}');
+      const providerId: ProviderId = saved.providerId in PROVIDER_DEFAULTS ? saved.providerId : 'deepseek';
+      providerProfiles = saved.profiles && typeof saved.profiles === 'object' ? saved.profiles : {};
+      // Migrate the old shared key only to the provider that originally owned it.
+      if (!saved.profiles) {
+        const apiKey = (await window.pdfStudio.secureGet('ai.apiKey')) ?? '';
+        providerProfiles[providerId] = { ...defaultConfig(providerId), ...saved, apiKey };
+      }
+      const config = { ...defaultConfig(providerId), ...providerProfiles[providerId] };
+      set({ providerId, config, activeModel: config.model, contextScope: saved.contextScope ?? 'document', providerReady: true });
     } catch {
-      set({ config: DEFAULT_CONFIG, providerReady: true });
+      providerProfiles = {};
+      set({ providerId: 'deepseek', config: DEFAULT_CONFIG, activeModel: DEFAULT_CONFIG.model, providerReady: true });
     }
   },
 
   saveConfig: async (patch, apiKey) => {
-    const next = { ...get().config, ...patch };
-    set({ config: next });
+    const providerId = get().providerId;
+    const next = { ...get().config, ...patch, apiKey: apiKey ?? get().config.apiKey };
     try {
-      if (apiKey !== undefined) {
-        await window.pdfStudio.secureSet('ai.apiKey', apiKey);
-        next.apiKey = apiKey;
-      }
-      const { apiKey: _k, ...rest } = next;
-      await window.pdfStudio.secureSet(
-        SETTINGS_KEY,
-        JSON.stringify({ ...rest, providerId: get().providerId, activeModel: get().activeModel, contextScope: get().contextScope })
-      );
+      validateConfig(next);
+      const profiles = { ...providerProfiles, [providerId]: next };
+      // Entire profile map, including keys, is encrypted by Electron safeStorage.
+      await window.pdfStudio.secureSet(SETTINGS_KEY, JSON.stringify({ providerId, profiles, contextScope: get().contextScope }));
+      providerProfiles = profiles;
+      set({ config: next, activeModel: next.model, chatError: null });
+      return true;
     } catch (e) {
-      const err = toFriendlyError(e, '保存 AI 配置失败。');
-      set({ chatError: err.friendly });
+      set({ chatError: toFriendlyError(e, '保存 AI 配置失败。').friendly });
+      return false;
     }
   },
 
   selectProvider: async (id) => {
-    const def = PROVIDER_DEFAULTS[id] ?? PROVIDER_DEFAULTS.custom;
-    const provider = providerRegistry.get(id);
-    let models: string[] = def.models;
-    try {
-      const list = await provider.getModels({ ...get().config, baseUrl: def.baseUrl || get().config.baseUrl });
-      if (list.length > 0) models = list.map((m) => m.id);
-    } catch {
-      // 保持默认
-    }
-    set({
-      providerId: id,
-      activeModel: models[0] ?? '',
-      config: {
-        ...get().config,
-        ...def,
-        model: models[0] ?? '',
-      },
-    });
-    await get().saveConfig({ ...get().config, ...def, model: models[0] ?? '' });
+    if (id === get().providerId) return;
+    const config = { ...defaultConfig(id), ...providerProfiles[id] };
+    set({ providerId: id, config, activeModel: config.model, chatError: null });
+    // An unconfigured custom endpoint can be selected before filling its form.
   },
 
   selectModel: async (model) => {
@@ -206,10 +182,12 @@ export const useAiStore = create<AiState>((set, get) => ({
   sendMessage: async (text, opts) => {
     const { config, messages, thinking, providerId, activeModel, contextScope } = get();
     if (thinking || !text.trim()) return;
-    if (!config.apiKey) {
+    if (!config.apiKey && providerId !== 'ollama' && !isLocalEndpoint(config.baseUrl)) {
       set({ settingsOpen: true, chatError: '请先在设置中配置 AI Provider 和 API Key。' });
       return;
     }
+    if (!(await confirmSend(config))) return;
+    if (get().thinking) return;
     // #8：开始新轮次，使旧请求（若有）失效
     const mySeq = beginAiRequest();
     // #8 修复：被取代的请求必须清理 UI 状态，否则 thinking/streaming 卡死面板
@@ -334,7 +312,6 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
             ? { role: 'tool' as const, content: h.content, tool_call_id: h.toolCallId }
             : { role: (h.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: h.content }
         ),
-        { role: 'user' as const, content: text },
       ];
 
       const assistantId = crypto.randomUUID();
@@ -474,8 +451,11 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
     if (pendingActions.length === 0) return;
     const doc = useDocumentStore.getState();
     const executed = pendingActions.map((a) => ({ ...a }));
+    const commandIds: string[] = [];
+    set({ pendingActions: [] });
     try {
-      for (const act of pendingActions) {
+      for (const act of executed) {
+        const previousCommand = commandHistory.lastCommandId;
         if (act.kind === 'delete') {
           await doc.deletePages(act.pages.map((p) => p - 1));
           act.result = `已删除第 ${act.pages.join('、')} 页`;
@@ -491,6 +471,7 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
           const path = await doc.extractPages(act.pages.map((p) => p - 1));
           act.result = path ? `已提取到 ${path}` : '已取消提取';
         }
+        if (commandHistory.lastCommandId && commandHistory.lastCommandId !== previousCommand) commandIds.push(commandHistory.lastCommandId);
       }
       // 把执行结果附加到最后一条 assistant 消息（找不到则新建一条）
       set((s) => {
@@ -499,7 +480,7 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
           pendingActions: [],
           messages: lastAssistant
             ? s.messages.map((m) =>
-                m.id === lastAssistant.id ? { ...m, pendingActions: undefined, executedActions: executed } : m
+                m.id === lastAssistant.id ? { ...m, pendingActions: undefined, executedActions: executed, executedCommandIds: commandIds } : m
               )
             : [
                 ...s.messages,
@@ -507,7 +488,7 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
                   id: crypto.randomUUID(),
                   role: 'assistant' as const,
                   content: '✓ 已完成',
-                  executedActions: executed,
+                  executedActions: executed, executedCommandIds: commandIds,
                   createdAt: Date.now(),
                 },
               ],
@@ -524,13 +505,18 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
     const { messages } = get();
     const target = messages.find((m) => m.id === messageId);
     if (!target?.executedActions) return;
+    const ids = target.executedCommandIds ?? [];
+    if (!commandHistory.canUndoCommands(ids)) {
+      set({ chatError: '该 AI 操作之后还有其他编辑，或操作仅导出了文件。请使用普通撤销逐步检查。' });
+      return;
+    }
     try {
       // 按操作数量撤销（每个操作在 CommandHistory 中对应一个 command）
-      for (let i = 0; i < target.executedActions.length; i++) {
+      for (let i = 0; i < ids.length; i++) {
         await commandHistory.undo();
       }
       set((s) => ({
-        messages: s.messages.map((m) => (m.id === messageId ? { ...m, executedActions: undefined } : m)),
+        messages: s.messages.map((m) => (m.id === messageId ? { ...m, executedActions: undefined, executedCommandIds: undefined } : m)),
       }));
     } catch (e) {
       const err = toFriendlyError(e, '撤销失败。');
@@ -541,9 +527,11 @@ ${contextPrompt || '当前没有打开任何 PDF 文档。若用户询问文档�
   // ---- V0.4：Document Intelligence（分析文档类型/主题/作者/总结） ----
   analyzeDocument: async () => {
     const { config, thinking, providerId, activeModel } = get();
-    if (!config.apiKey || thinking) return;
+    if ((!config.apiKey && providerId !== 'ollama' && !isLocalEndpoint(config.baseUrl)) || thinking || get().insightsLoading) return;
     const doc = useDocumentStore.getState().document;
     if (!doc) return;
+    if (!(await confirmSend(config))) return;
+    const requestSeq = currentAiRequestSeq();
     set({ insightsLoading: true, insights: null });
     try {
       const provider = providerRegistry.get(providerId);
@@ -567,6 +555,7 @@ ${full}`;
         { model: activeModel, messages: [{ role: 'user', content: prompt }], temperature: 0.3, maxTokens: 800 },
         config
       );
+      if (currentAiRequestSeq() !== requestSeq || useDocumentStore.getState().document?.id !== doc.id) { set({ insightsLoading: false }); return; }
       const parsed = parseInsightJson(resp.content);
       if (parsed) {
         set({
@@ -614,18 +603,7 @@ function toolStepLabel(name: string): string {
   return map[name] ?? '正在处理';
 }
 
-export function extractCitationsLocal(content: string): number[] {
-  const pages = new Set<number>();
-  const re = /第\s*(\d+)\s*(?:-|—|至)\s*(\d+)\s*页|第\s*(\d+)\s*页/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    if (m[1] && m[2]) {
-      for (let p = Number(m[1]); p <= Number(m[2]); p++) pages.add(p);
-    }
-    if (m[3]) pages.add(Number(m[3]));
-  }
-  return Array.from(pages).sort((a, b) => a - b);
-}
+export { extractCitations as extractCitationsLocal } from '@ai/citations';
 
 interface InsightJson {
   type?: string;

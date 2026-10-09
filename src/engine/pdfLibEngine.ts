@@ -33,6 +33,8 @@ export async function applyOperations(
   const deleted = new Set(ops.deletedPages);
   const order = ops.pageOrder.filter((i) => i >= 0 && i < originalCount && !deleted.has(i));
 
+  if (!order.length) throw new Error("至少需要保留一页。");
+
   // 收集需要保留的页（按排序后顺序），应用旋转
   const kept = order.filter((idx) => !deleted.has(idx));
   const pages = kept.map((idx) => pdf.getPage(idx));

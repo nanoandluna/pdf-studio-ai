@@ -1,0 +1,42 @@
+name: Windows release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify tag matches package version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag does not match package.json' }
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:smoke
+      - name: Build portable and installer
+        run: npx electron-builder --win portable nsis --publish never
+      - name: Create checksums and draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $directory = "release/$version"
+          $files = @(Get-ChildItem -LiteralPath $directory -Filter '*.exe')
+          if ($files.Count -ne 2) { throw 'Expected portable executable and installer' }
+          $lines = $files | ForEach-Object { "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
+          $checksum = Join-Path $directory 'SHA256SUMS.txt'
+          $lines | Set-Content -LiteralPath $checksum -Encoding utf8
+          $assets = @($files.FullName) + @($checksum)
+          gh release create $env:GITHUB_REF_NAME @assets --draft --verify-tag --title "PDF Studio AI $version" --generate-notes
